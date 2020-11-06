@@ -1,7 +1,7 @@
 package monitor
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -51,7 +51,7 @@ func (coord *Coordinator) RunCommands() {
 		go func(cmd MonitoredCmd) {
 			err := cmd.Run()
 			if err != nil {
-				log.Fatal("error running command: ", err)
+				fmt.Println(err)
 			}
 			coord.wg.Done()
 		}(cmd)

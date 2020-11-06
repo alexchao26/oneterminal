@@ -1,7 +1,7 @@
-package cmd
+package cli
 
 import (
-	"github.com/alexchao26/oneterminal/pkg/monitor-cmd"
+	"github.com/alexchao26/oneterminal/pkg/monitor"
 
 	"github.com/spf13/cobra"
 )
