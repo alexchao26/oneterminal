@@ -6,7 +6,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
-	"time"
+
+	"github.com/alexchao26/oneterminal/pkg/monitor-cmd"
 
 	"github.com/spf13/cobra"
 )
@@ -66,58 +67,48 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		osCmd := exec.Command("zsh", "-c", "go run dev-services/ticker/ticker.go")
-		osCmd2 := exec.Command("zsh", "-c", "go run dev-services/ticker/ticker.go")
+		// osCmd := exec.Command("zsh", "-c", "go run dev-services/ticker/ticker.go")
+		// osCmd2 := exec.Command("zsh", "-c", "go run dev-services/ticker/ticker.go")
 
-		// set stdout and err to stdout and err
-		osCmd.Stdout = os.Stdout
-		osCmd.Stderr = os.Stdout
-		osCmd2.Stdout = os.Stdout
-		osCmd2.Stderr = os.Stdout
+		coordinator := monitor.NewCoordinator()
 
-		// what directory to run this command in
-		osCmd.Dir = "/Users/chao/go/src/github.com/alexchao26/oneterminal"
-		osCmd2.Dir = "/Users/chao/go/src/github.com/alexchao26/oneterminal"
+		m1 := monitor.NewMonitoredCmd(
+			"go run dev-services/ticker/ticker.go",
+			coordinator,
+			monitor.SetCmdDir("/Users/chao/go/src/github.com/alexchao26/oneterminal"))
 
-		sigChan := make(chan os.Signal, 1)
-		monitored := NewMonitoredCmd(sigChan, osCmd)
+		go m1.Run()
 
-		sigChan2 := make(chan os.Signal, 1)
-		monitored2 := NewMonitoredCmd(sigChan2, osCmd2)
+		// make a channel that will relay termination signals to all cancel channels?
+		relayChannel := make(chan os.Signal, 1)
+		signal.Notify(relayChannel, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
 
-		go monitored.Run()
-		go monitored2.Run()
+		for {
+			select {
+			case sig := <-relayChannel:
+				fmt.Println("received termination signal to relay", sig)
+				m1.Interrupt()
 
-		// make a channel that will amplify termination signals to all cancel channels?
-		amplifyChannel := make(chan os.Signal, 1)
-		signal.Notify(amplifyChannel, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
+				// the signal needs time to kill the other process before exiting this/main app...
+				// time.Sleep(time.Second * 2)
+				// os.Exit(1)
+			case <-coordinator.SyncChan:
+				fmt.Println("underlying command done")
+				coordinator.FinishCommand()
+				if coordinator.GetStatus() == monitor.StatusDone {
+					fmt.Println("coordinator done... exiting...")
+					os.Exit(1)
+				}
+				fmt.Println("still pending jobs...")
+			}
+		}
 
-		go func() {
-			sig := <-amplifyChannel
-			fmt.Println("received signal", sig)
-			sigChan <- sig
-			sigChan2 <- sig
+		// time.Sleep(time.Second * 20)
+		// fmt.Println("Exiting...")
+		// relayChannel <- syscall.SIGINT
 
-			// the signal needs time to kill the other process before exiting this/main app...
-			time.Sleep(time.Second * 2)
-			os.Exit(1)
-		}()
-		// defer func() {
-		// 	fmt.Println("sending interrupt signal")
-		// 	sigChan <- syscall.SIGINT
-		// }()
-
-		// 5 second auto kill
-		// fmt.Println("OS CMD", osCmd)
-		// time.Sleep(time.Second * 5)
-		// fmt.Println("sending interrupt signal")
-		// sigChan <- syscall.SIGINT
-
-		time.Sleep(time.Second * 20)
-		fmt.Println("Exiting...")
-		amplifyChannel <- syscall.SIGINT
-		time.Sleep(time.Second * 5)
-		//
+		// things go bad if the main go routine ends before everything else shuts down
+		// time.Sleep(time.Second * 45)
 	},
 }
 
