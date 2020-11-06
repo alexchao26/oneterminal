@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"syscall"
@@ -10,15 +9,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-// MonitoredCmd is a wrapper around exec.Cmd
+// MonitoredCmd is a wrapper around exec.command
 // its implementations calls the shell directly and
 // sending the process a termination/interruption signal
 // and checking if the process has completed
 type MonitoredCmd struct {
-	signalChan  chan syscall.Signal
-	done        chan bool
-	coordinator *Coordinator
-	*exec.Cmd
+	command    *exec.Cmd           // underlying command to run
+	signalChan chan syscall.Signal // channel that receives any interrupt signals
+	done       chan bool           // channel to cleanup when the command finishes
 }
 
 // NewMonitoredCmd makes a command that can be interrupted
@@ -26,25 +24,21 @@ type MonitoredCmd struct {
 // Interrupt method
 // Default shell used is zsh, use functional options to change
 // e.g. monitor.NewMonitoredCmd("echo hello", monitor.BashShell)
-func NewMonitoredCmd(command string, coordinator *Coordinator, options ...func(MonitoredCmd) MonitoredCmd) MonitoredCmd {
+func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd) MonitoredCmd {
 	c := exec.Command("zsh", "-c", command)
-
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stdout
-
-	// this sets the child process's PID to be the parent's PID
+	// SysProcAttr sets the child process's PID to the parent's PID
+	// making the process identifiable if it needs to be interrupted
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	m := MonitoredCmd{
-		Cmd:         c,
-		signalChan:  make(chan syscall.Signal, 1),
-		done:        make(chan bool, 1),
-		coordinator: coordinator,
+		command:    c,
+		signalChan: make(chan syscall.Signal, 1),
+		done:       make(chan bool, 1),
 	}
 
-	// increment coordinator's pending job count
-	coordinator.PendingCmdCount++
-
+	// apply functional options
 	for _, f := range options {
 		m = f(m)
 	}
@@ -54,40 +48,46 @@ func NewMonitoredCmd(command string, coordinator *Coordinator, options ...func(M
 
 // BashShell is a functional option to change the executing shell to zsh
 func BashShell(m MonitoredCmd) MonitoredCmd {
-	m.Cmd.Args[0] = "bash"
+	m.command.Args[0] = "bash"
 	resolvedPath, err := exec.LookPath("bash")
 	if err != nil {
 		fmt.Println("Error setting bash as shell", err)
 	}
-	m.Cmd.Path = resolvedPath
-	fmt.Println("cmd args are", m.Cmd.Args)
+	m.command.Path = resolvedPath
+	fmt.Println("cmd args are", m.command.Args)
 	return m
 }
 
 // SetCmdDir is a functional option that adds a Dir
-// property to the underlying Cmd. Dir is the directory
+// property to the underlying command. Dir is the directory
 // to execute the command in
 func SetCmdDir(dir string) func(MonitoredCmd) MonitoredCmd {
 	return func(m MonitoredCmd) MonitoredCmd {
-		m.Cmd.Dir = dir
+		m.command.Dir = dir
 		return m
 	}
 }
 
-// Run will run the underlying command
-// If a termination signal is sent to its signalChan, the
-// process will be killed
+// SilenceOutput sets the command's Stdout and Stderr to nil
+// so no output will be seen in the terminal
+func SilenceOutput(m MonitoredCmd) MonitoredCmd {
+	m.command.Stdout = nil
+	m.command.Stderr = nil
+	return m
+}
+
+// Run will run the underlying command. This function is blocking
+// until the command is done or is interrupted
+// It can be interrupted via the Interrupt receiver method
 // TODO the done channel?? will expose the completion status of the process.. somehow
 func (m MonitoredCmd) Run() error {
 	// when the function returns, write to the done channel to cleanup goroutines
 	defer func() {
-		fmt.Println("writing to doneness channels")
 		m.done <- true
-		m.coordinator.SyncChan <- true
 	}()
 
 	// start the command's execution
-	if err := m.Cmd.Start(); err != nil {
+	if err := m.command.Start(); err != nil {
 		fmt.Println("error starting command", err)
 		return errors.Wrap(err, "failed to start command")
 	}
@@ -96,22 +96,21 @@ func (m MonitoredCmd) Run() error {
 	go func() {
 		select {
 		case sig := <-m.signalChan:
-			syscall.Kill(-m.Cmd.Process.Pid, sig)
-			log.Println("command was interrupted")
+			syscall.Kill(-m.command.Process.Pid, sig)
 		case <-m.done:
-			log.Println("command ended naturally")
+			// close channels
 			close(m.done)
+			close(m.signalChan)
 		}
 	}()
 
-	err := m.Cmd.Wait()
-	fmt.Println("cmd result", err)
-	return err
+	return m.command.Wait()
 }
 
 // Interrupt will send an interrupt signal to the process
 func (m MonitoredCmd) Interrupt() {
 	m.signalChan <- syscall.SIGINT
-	// todo add a way to stall until the process is actually over? can you call cmd.Wait() now??
 	return
 }
+
+// TODO add stdout wrapper

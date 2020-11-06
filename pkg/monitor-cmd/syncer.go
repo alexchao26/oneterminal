@@ -1,49 +1,68 @@
 package monitor
 
-import "sync"
-
-// CoordinatorStatus will indicate the status of all the commands
-// being coordinated
-type CoordinatorStatus int
-
-const (
-	// StatusIncomplete means not all commands have finished running
-	StatusIncomplete CoordinatorStatus = iota
-	// StatusDone means all commands have finished running
-	StatusDone CoordinatorStatus = iota
+import (
+	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 )
 
 // Coordinator uses a channel for commands to communicate their donness
-// and has a mutex to prevent races against a PendingCmdCount
+// and has a mutex to prevent races against a pendingCmdCount
 type Coordinator struct {
-	// SyncChan can be listened to by other
-	SyncChan        chan bool
-	PendingCmdCount int
-	sync.RWMutex
+	commands []MonitoredCmd
+	wg       sync.WaitGroup
 }
 
-// NewCoordinator makes a new coordinator for a given number of cmds
-func NewCoordinator() *Coordinator {
+// NewCoordinator makes a new coordinator
+// it can be optionally initialized with commands
+// or they can be added later via AddCommands
+func NewCoordinator(commands ...MonitoredCmd) *Coordinator {
 	return &Coordinator{
-		SyncChan: make(chan bool),
+		commands: append([]MonitoredCmd{}, commands...),
 	}
 }
 
-// FinishCommand decrements PendingCmdCount in a race safe manner
-func (c *Coordinator) FinishCommand() {
-	c.Lock()
-	c.PendingCmdCount--
-	c.Unlock()
+// AddCommands will add MonitoredCmds to the commands slice
+// increment pendingCmdCount
+func (coord *Coordinator) AddCommands(commands ...MonitoredCmd) {
+	// does not require a mutex/lock because the API is designed
+	// to have all commands added prior to running, i.e. synchronously
+	coord.commands = append(coord.commands, commands...)
 }
 
-// GetStatus returns if the PendingCmdCount is equal to zero
-// It is race safe via a read lock
-func (c *Coordinator) GetStatus() CoordinatorStatus {
-	c.RLock()
-	defer c.RUnlock()
+// RunCommands will run all of the added commands and block until they have all
+// finished running. The can occur from the processes ending naturally
+// or being interrupted
+// TODO - timing of when to run each command?
+// TODO - error returning from a goroutine? look @ http package for inspiration
+func (coord *Coordinator) RunCommands() {
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
 
-	if c.PendingCmdCount == 0 {
-		return StatusDone
+	go func() {
+		<-signalChan
+		coord.SendInterrupt()
+	}()
+
+	for _, cmd := range coord.commands {
+		coord.wg.Add(1)
+		go func(cmd MonitoredCmd) {
+			err := cmd.Run()
+			if err != nil {
+				log.Fatal("error running command: ", err)
+			}
+			coord.wg.Done()
+		}(cmd)
 	}
-	return StatusIncomplete
+
+	coord.wg.Wait()
+}
+
+// SendInterrupt will relay an interrupt signal to all underlying commands
+func (coord *Coordinator) SendInterrupt() {
+	for _, cmd := range coord.commands {
+		cmd.Interrupt()
+	}
 }
