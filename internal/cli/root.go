@@ -38,4 +38,5 @@ func init() {
 	yaml.ParseAndAddToRoot(rootCmd)
 
 	rootCmd.AddCommand(commands.ExampleCmd)
+	rootCmd.AddCommand(commands.CompletionCmd)
 }
