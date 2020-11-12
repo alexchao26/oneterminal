@@ -17,6 +17,7 @@ type MonitoredCmd struct {
 	command    *exec.Cmd           // underlying command to run
 	signalChan chan syscall.Signal // channel that receives any interrupt signals
 	done       chan bool           // channel to cleanup when the command finishes
+	finished   bool                // boolean for the completion status of a command
 }
 
 // NewMonitoredCmd makes a command that can be interrupted
@@ -100,20 +101,20 @@ func (m MonitoredCmd) Run() error {
 		select {
 		case sig := <-m.signalChan:
 			syscall.Kill(-m.command.Process.Pid, sig)
-		case <-m.done:
-			// close channels
-			close(m.done)
 			close(m.signalChan)
+		case <-m.done:
+			close(m.done)
 		}
 	}()
 
-	return m.command.Wait()
+	err := m.command.Wait()
+	m.finished = true
+	return err
 }
 
 // Interrupt will send an interrupt signal to the process
 func (m MonitoredCmd) Interrupt() {
 	m.signalChan <- syscall.SIGINT
-	return
 }
 
 // TODO add stdout wrapper
