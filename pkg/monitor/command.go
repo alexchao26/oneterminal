@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/alexchao26/oneterminal/pkg/writer"
+
 	"github.com/pkg/errors"
 )
 
@@ -25,10 +27,12 @@ type MonitoredCmd struct {
 // Interrupt method
 // Default shell used is zsh, use functional options to change
 // e.g. monitor.NewMonitoredCmd("echo hello", monitor.BashShell)
-func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd) MonitoredCmd {
+func NewMonitoredCmd(command, outputPrefix string, options ...func(MonitoredCmd) MonitoredCmd) MonitoredCmd {
 	c := exec.Command("zsh", "-c", command)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stdout
+	// prefixedStdout := writer.NewPrefixedStdout(outputPrefix)
+
+	c.Stdout = writer.NewPrefixedStdout(outputPrefix)
+	c.Stderr = writer.NewPrefixedStdout(outputPrefix)
 	// SysProcAttr sets the child process's PID to the parent's PID
 	// making the process identifiable if it needs to be interrupted
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -116,5 +120,3 @@ func (m MonitoredCmd) Run() error {
 func (m MonitoredCmd) Interrupt() {
 	m.signalChan <- syscall.SIGINT
 }
-
-// TODO add stdout wrapper

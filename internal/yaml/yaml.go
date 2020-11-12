@@ -63,8 +63,9 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 				// Setup Orchestrator and its commands
 				Orchestrator := monitor.NewOrchestrator()
 
-				for _, cmd := range config.Commands {
-					monitoredCmd := monitor.NewMonitoredCmd(cmd.Text)
+				for i, cmd := range config.Commands {
+					prefix := fmt.Sprintf("[%02d]", i)
+					monitoredCmd := monitor.NewMonitoredCmd(cmd.Text, prefix)
 					if config.Shell == "bash" {
 						monitoredCmd = monitor.BashShell(monitoredCmd)
 					}
