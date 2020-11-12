@@ -165,7 +165,7 @@ Some say you can hear it from space.`,
 				Text:    "echo hello from window 2",
 				Silence: false,
 			}, {
-				Text:    "echo they silenced me :'(",
+				Text:    "echo they silenced me :(",
 				Silence: true,
 			},
 		},
@@ -217,7 +217,7 @@ commands:
   silence: false
 - text: echo hello from window 2
   silence: false
-- text: echo they silenced me :'(
+- text: echo "they silenced me :'("
   silence: true
 `),
 		os.ModePerm)
