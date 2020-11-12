@@ -46,7 +46,11 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 	// disallow commands with the same name
 	allNames := make(map[string]bool)
 
-	for _, config := range cmdConfigs {
+	for _, configPointer := range cmdConfigs {
+		// this assignment to config is needed because ranging for loop assign a
+		// pointer that iterates thorugh a slice, i.e. all commands would end up
+		// being overwritten with the last config/element in the slice
+		config := configPointer
 		if allNames[config.Name] {
 			panic(fmt.Sprintf("Multiple commands have the same name %s", config.Name))
 		}
@@ -85,6 +89,7 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 		if config.Long != "" {
 			cobraCommand.Long = config.Long
 		}
+
 		rootCmd.AddCommand(cobraCommand)
 	}
 }
