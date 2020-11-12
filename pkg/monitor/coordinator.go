@@ -36,7 +36,6 @@ func (coord *Coordinator) AddCommands(commands ...MonitoredCmd) {
 // finished running. The can occur from the processes ending naturally
 // or being interrupted
 // TODO - timing of when to run each command?
-// TODO - error returning from a goroutine? look @ http package for inspiration
 func (coord *Coordinator) RunCommands() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)

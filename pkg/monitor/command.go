@@ -51,10 +51,10 @@ func BashShell(m MonitoredCmd) MonitoredCmd {
 	m.command.Args[0] = "bash"
 	resolvedPath, err := exec.LookPath("bash")
 	if err != nil {
-		fmt.Println("Error setting bash as shell", err)
+		panic(fmt.Sprintf("Error setting bash as shell %s", err))
 	}
+
 	m.command.Path = resolvedPath
-	fmt.Println("cmd args are", m.command.Args)
 	return m
 }
 
@@ -63,7 +63,12 @@ func BashShell(m MonitoredCmd) MonitoredCmd {
 // to execute the command in
 func SetCmdDir(dir string) func(MonitoredCmd) MonitoredCmd {
 	return func(m MonitoredCmd) MonitoredCmd {
-		m.command.Dir = dir
+		expandedDir := os.ExpandEnv(dir)
+		if _, err := os.Stat(expandedDir); os.IsNotExist(err) {
+			panic(fmt.Sprintf("Directory does not exist %s\nNOTE: use $HOME, not ~", err))
+		}
+
+		m.command.Dir = expandedDir
 		return m
 	}
 }
@@ -79,7 +84,6 @@ func SilenceOutput(m MonitoredCmd) MonitoredCmd {
 // Run will run the underlying command. This function is blocking
 // until the command is done or is interrupted
 // It can be interrupted via the Interrupt receiver method
-// TODO the done channel?? will expose the completion status of the process.. somehow
 func (m MonitoredCmd) Run() error {
 	// when the function returns, write to the done channel to cleanup goroutines
 	defer func() {
@@ -88,7 +92,6 @@ func (m MonitoredCmd) Run() error {
 
 	// start the command's execution
 	if err := m.command.Start(); err != nil {
-		fmt.Println("error starting command", err)
 		return errors.Wrap(err, "failed to start command")
 	}
 
