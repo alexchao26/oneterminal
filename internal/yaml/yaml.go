@@ -60,8 +60,8 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 			Use:   config.Name,
 			Short: config.Short,
 			Run: func(cmd *cobra.Command, args []string) {
-				// Setup coordinator and its commands
-				coordinator := monitor.NewCoordinator()
+				// Setup Orchestrator and its commands
+				Orchestrator := monitor.NewOrchestrator()
 
 				for _, cmd := range config.Commands {
 					monitoredCmd := monitor.NewMonitoredCmd(cmd.Text)
@@ -75,10 +75,10 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 						monitoredCmd = monitor.SilenceOutput(monitoredCmd)
 					}
 
-					coordinator.AddCommands(monitoredCmd)
+					Orchestrator.AddCommands(monitoredCmd)
 				}
 
-				coordinator.RunCommands()
+				Orchestrator.RunCommands()
 			},
 		}
 		if config.Long != "" {

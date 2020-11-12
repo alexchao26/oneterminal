@@ -28,9 +28,9 @@ to quickly create a Cobra application.`,
 			monitor.SetCmdDir("/Users/chao/go/src/github.com/alexchao26/oneterminal"),
 			monitor.SilenceOutput)
 
-		coord := monitor.NewCoordinator()
-		coord.AddCommands(m1)
-		coord.AddCommands(m2)
-		coord.RunCommands()
+		orchestrator := monitor.NewOrchestrator()
+		orchestrator.AddCommands(m1)
+		orchestrator.AddCommands(m2)
+		orchestrator.RunCommands()
 	},
 }
