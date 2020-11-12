@@ -23,13 +23,13 @@ type OneTerminalConfig struct {
 	Shell    string    `yaml:"shell"`
 	Short    string    `yaml:"short"`
 	Long     string    `yaml:"long,omitempty"`
-	CmdDir   string    `yaml:"directory,omitempty"`
 	Commands []Command `yaml:"commands"`
 }
 
 // Command is what will run in one terminal "window"/tab
 type Command struct {
 	Text    string `yaml:"text"`
+	CmdDir  string `yaml:"directory,omitempty"`
 	Silence bool   `yaml:"silence"`
 }
 
@@ -68,8 +68,8 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 					if config.Shell == "bash" {
 						monitoredCmd = monitor.BashShell(monitoredCmd)
 					}
-					if config.CmdDir != "" {
-						monitoredCmd = monitor.SetCmdDir(config.CmdDir)(monitoredCmd)
+					if cmd.CmdDir != "" {
+						monitoredCmd = monitor.SetCmdDir(cmd.CmdDir)(monitoredCmd)
 					}
 					if cmd.Silence {
 						monitoredCmd = monitor.SilenceOutput(monitoredCmd)
@@ -155,11 +155,18 @@ func MakeExampleConfigFromStruct() error {
 hello to you multiple times. 
 	
 Some say you can hear it from space.`,
-		CmdDir: "$HOME/go",
 		Commands: []Command{
-			{"echo hello from window 1", false},
-			{"echo hello from window 2", false},
-			{"echo hello from window 3", true},
+			{
+				Text:    "echo hello from window 1",
+				CmdDir:  "$HOME/go",
+				Silence: false,
+			}, {
+				Text:    "echo hello from window 2",
+				Silence: false,
+			}, {
+				Text:    "echo they silenced me :'(",
+				Silence: true,
+			},
 		},
 	}
 
@@ -198,14 +205,14 @@ short: an example command that says hello twice
 # OPTIONAL: longer description of what this command does
 long: Optional longer description
 
-# OPTIONAL: directory to run the command from, use $HOME instead of ~
-# this path will be expanded via os.ExpandEnv
-directory: $HOME/go
-
-# commands contain the text (the command to run, will be expanded via os.ExpandEnv)
-# and an optional silence boolean, if true will silence that command's output
+# commands are made of
+#   1. text string (the command to run, will be expanded via os.ExpandEnv)
+#   2. directory string (optional), what directory to run the command from
+#      NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
+#   3. silence boolean (optional: default false), if true will silence that command's output
 commands:
 - text: echo hello from window 1
+  directory: $HOME/go
   silence: false
 - text: echo hello from window 2
   silence: false

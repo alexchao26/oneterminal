@@ -89,8 +89,8 @@ func TestParseConfigs(t *testing.T) {
 			if config.Long == "" {
 				t.Errorf("Expected config's Long to not be an empty string, got %q", config.Long)
 			}
-			if config.CmdDir != "$HOME/go" {
-				t.Errorf("Expected config's CmdDir to be set to $HOME/go, got %q", config.CmdDir)
+			if dir := config.Commands[0].CmdDir; dir != "$HOME/go" {
+				t.Errorf("Expected config's first command to have CmdDir to be set to $HOME/go, got %q", dir)
 			}
 			if len(config.Commands) != 3 {
 				t.Errorf("Expected there to be 3 commands, got %d", len(config.Commands))

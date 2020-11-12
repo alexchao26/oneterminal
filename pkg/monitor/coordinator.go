@@ -62,6 +62,8 @@ func (coord *Coordinator) RunCommands() {
 // SendInterrupt will relay an interrupt signal to all underlying commands
 func (coord *Coordinator) SendInterrupt() {
 	for _, cmd := range coord.commands {
+		// TODO add a check for the command's status, if it is already done
+		// TODO then don't send an interrupt signal
 		cmd.Interrupt()
 	}
 }
