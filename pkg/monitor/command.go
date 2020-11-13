@@ -27,12 +27,13 @@ type MonitoredCmd struct {
 // Interrupt method
 // Default shell used is zsh, use functional options to change
 // e.g. monitor.NewMonitoredCmd("echo hello", monitor.BashShell)
-func NewMonitoredCmd(command, outputPrefix string, options ...func(MonitoredCmd) MonitoredCmd) MonitoredCmd {
+func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd) MonitoredCmd {
 	c := exec.Command("zsh", "-c", command)
-	// prefixedStdout := writer.NewPrefixedStdout(outputPrefix)
 
-	c.Stdout = writer.NewPrefixedStdout(outputPrefix)
-	c.Stderr = writer.NewPrefixedStdout(outputPrefix)
+	// default outputs to os.Stdout
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stdout
+
 	// SysProcAttr sets the child process's PID to the parent's PID
 	// making the process identifiable if it needs to be interrupted
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -84,6 +85,17 @@ func SilenceOutput(m MonitoredCmd) MonitoredCmd {
 	m.command.Stdout = nil
 	m.command.Stderr = nil
 	return m
+}
+
+// PrefixStdout is a functional option that changes a monitored command's
+// Stdout and Stderr writes to start all newlines with the given prefix
+func PrefixStdout(prefix string) func(MonitoredCmd) MonitoredCmd {
+	return func(m MonitoredCmd) MonitoredCmd {
+		prefixedStdout := writer.NewPrefixedStdout(prefix)
+		m.command.Stdout = prefixedStdout
+		m.command.Stderr = prefixedStdout
+		return m
+	}
 }
 
 // Run will run the underlying command. This function is blocking

@@ -28,9 +28,16 @@ type OneTerminalConfig struct {
 
 // Command is what will run in one terminal "window"/tab
 type Command struct {
-	Text    string `yaml:"text"`
+	Name    string `yaml:"name"`
+	Command string `yaml:"command"`
 	CmdDir  string `yaml:"directory,omitempty"`
 	Silence bool   `yaml:"silence"`
+}
+
+var reservedNames = map[string]bool{
+	"completion": true,
+	"example":    true,
+	"help":       true,
 }
 
 // ParseAndAddToRoot will be invoked when oneterminal starts
@@ -55,8 +62,9 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 			panic(fmt.Sprintf("Multiple commands have the same name %s", config.Name))
 		}
 		allNames[config.Name] = true
-		if config.Name == "example" {
-			panic("The command name \"example\" is reserved :(")
+
+		if reservedNames[config.Name] {
+			panic(fmt.Sprintf("The command name %q is reserved :(", config.Name))
 		}
 
 		// create the final cobra command and add it to the root command
@@ -67,18 +75,22 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 				// Setup Orchestrator and its commands
 				Orchestrator := monitor.NewOrchestrator()
 
-				for i, cmd := range config.Commands {
-					prefix := fmt.Sprintf("[%02d]", i)
-					monitoredCmd := monitor.NewMonitoredCmd(cmd.Text, prefix)
+				for _, cmd := range config.Commands {
+					var options []func(monitor.MonitoredCmd) monitor.MonitoredCmd
+					if cmd.Name != "" {
+						options = append(options, monitor.PrefixStdout(cmd.Name))
+					}
 					if config.Shell == "bash" {
-						monitoredCmd = monitor.BashShell(monitoredCmd)
+						options = append(options, monitor.BashShell)
 					}
 					if cmd.CmdDir != "" {
-						monitoredCmd = monitor.SetCmdDir(cmd.CmdDir)(monitoredCmd)
+						options = append(options, monitor.SetCmdDir(cmd.CmdDir))
 					}
 					if cmd.Silence {
-						monitoredCmd = monitor.SilenceOutput(monitoredCmd)
+						options = append(options, monitor.SilenceOutput)
 					}
+
+					monitoredCmd := monitor.NewMonitoredCmd(cmd.Command, options...)
 
 					Orchestrator.AddCommands(monitoredCmd)
 				}
@@ -163,14 +175,17 @@ hello to you multiple times.
 Some say you can hear it from space.`,
 		Commands: []Command{
 			{
-				Text:    "echo hello from window 1",
+				Name:    "greeter-1",
+				Command: "echo hello from window 1",
 				CmdDir:  "$HOME/go",
 				Silence: false,
 			}, {
-				Text:    "echo hello from window 2",
+				Name:    "greeter-2",
+				Command: "echo hello from window 2",
 				Silence: false,
 			}, {
-				Text:    "echo they silenced me :(",
+				Name:    "",
+				Command: "echo they silenced me :(",
 				Silence: true,
 			},
 		},
@@ -212,17 +227,23 @@ short: an example command that says hello twice
 long: Optional longer description
 
 # commands are made of
-#   1. text string (the command to run, will be expanded via os.ExpandEnv)
-#   2. directory string (optional), what directory to run the command from
+#   1. command string (the command to run, will be expanded via os.ExpandEnv)
+#   2. name string, text to prefix each line of this command's output
+#      NOTE: an empty string is a valid name and is useful for things like vault
+#            which write to stdout in small chunks
+#   3. directory string (optional), what directory to run the command from
 #      NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
-#   3. silence boolean (optional: default false), if true will silence that command's output
+#   4. silence boolean (optional: default false), if true will silence that command's output
 commands:
-- text: echo hello from window 1
+- name: greeter-1
+  command: echo hello from window 1
   directory: $HOME/go
   silence: false
-- text: echo hello from window 2
+- name: greeter-2
+  command: echo hello from window 2
   silence: false
-- text: echo "they silenced me :'("
+- name: ""
+  command: echo "they silenced me :'("
   silence: true
 `),
 		os.ModePerm)

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -17,8 +17,8 @@ type PrefixedStdout struct {
 	stdout io.Writer
 }
 
-// NewPrefixedStdout returns a new instance of PrefixedStdout
-// TODO add to yaml config for optional prefix name
+// NewPrefixedStdout returns a new instance of PrefixedStdout which can be used
+// as a stand in for Stdout
 func NewPrefixedStdout(prefix string) *PrefixedStdout {
 	return &PrefixedStdout{
 		prefix: prefix,
@@ -43,15 +43,14 @@ func (p *PrefixedStdout) Write(bytes []byte) (int, error) {
 	return len(bytes), err
 }
 
-// TODO add test
+// prefixEachLine adds a given prefix with a bar/pipe "|" to each newline
+// of a given string
 func prefixEveryline(in, prefix string) (out string) {
-	newLineRegex := regexp.MustCompile("\n")
+	lines := strings.Split(in, "\n")
 
-	// add the prefix and a space after all newlines
-	prefixedString := newLineRegex.ReplaceAllString(in, fmt.Sprintf("\n%s ", prefix))
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
 
-	// add prefix onto start, remove last prefix from end (5 characters)
-	prefixedString = fmt.Sprintf("%s %s", prefix, prefixedString[:len(prefixedString)-5])
-
-	return prefixedString
+	return prefix + " | " + strings.Join(lines, fmt.Sprintf("\n%s | ", prefix)) + "\n"
 }

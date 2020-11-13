@@ -66,7 +66,7 @@ func TestMakeExampleConfigFromStructWithInstructions(t *testing.T) {
 	os.Remove(filepath)
 }
 
-func TestParseConfigs(t *testing.T) {
+func TestParseConfigs1(t *testing.T) {
 	// add at least one config
 	MakeExampleConfigFromStruct()
 	configs, err := ParseConfigs()
