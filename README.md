@@ -49,17 +49,23 @@ short: an example command that says hello twice
 long: Optional longer description
 
 # commands are made of
-#   1. text string (the command to run, will be expanded via os.ExpandEnv)
-#   2. directory string (optional), what directory to run the command from
+#   1. command string (the command to run, will be expanded via os.ExpandEnv)
+#   2. name string, text to prefix each line of this command's output
+#      NOTE: an empty string is a valid name and is useful for things like vault
+#            which write to stdout in small chunks
+#   3. directory string (optional), what directory to run the command from
 #      NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
-#   3. silence boolean (optional: default false), if true will silence that command's output
+#   4. silence boolean (optional: default false), if true will silence that command's output
 commands:
-- text: echo hello from window 1
+- name: greeter-1
+  command: echo hello from window 1
   directory: $HOME/go
   silence: false
-- text: echo hello from window 2
+- name: greeter-2
+  command: echo hello from window 2
   silence: false
-- text: echo "they silenced me :'("
+- name: ""
+  command: echo "they silenced me :'("
   silence: true
 ```
 
@@ -69,7 +75,7 @@ Run `oneterminal help` to see this command show up under available commands. Not
 
 `oneterminal example`: Makes a demo oneterminal config in ~/.config/oneterminal
 
-`oneterminal competion --help`: Get helper text to setup shell completion for zsh or bash shells
+`oneterminal completion --help`: Get helper text to setup shell completion for zsh or bash shells
 
 `oneterminal help`: Help about any command
 
