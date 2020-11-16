@@ -26,11 +26,11 @@ to quickly create a Cobra application.`,
 		m2 := monitor.NewMonitoredCmd(
 			"go run internal/demo/ticker-service/ticker.go",
 			monitor.SetCmdDir("/Users/chao/go/src/github.com/alexchao26/oneterminal"),
-			monitor.SilenceOutput)
+			monitor.SetSilenceOutput)
 
 		orchestrator := monitor.NewOrchestrator()
-		orchestrator.AddCommands(m1)
-		orchestrator.AddCommands(m2)
+		orchestrator.AddCommands(&m1)
+		orchestrator.AddCommands(&m2)
 		orchestrator.RunCommands()
 	},
 }

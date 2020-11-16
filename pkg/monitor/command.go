@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"strings"
 	"syscall"
-
-	"github.com/alexchao26/oneterminal/pkg/writer"
 
 	"github.com/pkg/errors"
 )
@@ -16,23 +16,22 @@ import (
 // sending the process a termination/interruption signal
 // and checking if the process has completed
 type MonitoredCmd struct {
-	command    *exec.Cmd           // underlying command to run
-	signalChan chan syscall.Signal // channel that receives any interrupt signals
-	done       chan bool           // channel to cleanup when the command finishes
-	finished   bool                // boolean for the completion status of a command
+	command       *exec.Cmd
+	name          string
+	silenceOutput bool
+	signalChan    chan syscall.Signal
+	ready         bool           // if command's dependent's can begin
+	readyPattern  *regexp.Regexp // pattern to match against command outputs
+	readyChan     chan bool      // channel needed to get around no pointer receiver on Write method
 }
 
 // NewMonitoredCmd makes a command that can be interrupted
 // via its signalChan channel, which is exposed by its
 // Interrupt method
 // Default shell used is zsh, use functional options to change
-// e.g. monitor.NewMonitoredCmd("echo hello", monitor.BashShell)
+// e.g. monitor.NewMonitoredCmd("echo hello", monitor.SetBashShell)
 func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd) MonitoredCmd {
 	c := exec.Command("zsh", "-c", command)
-
-	// default outputs to os.Stdout
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stdout
 
 	// SysProcAttr sets the child process's PID to the parent's PID
 	// making the process identifiable if it needs to be interrupted
@@ -41,7 +40,7 @@ func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd)
 	m := MonitoredCmd{
 		command:    c,
 		signalChan: make(chan syscall.Signal, 1),
-		done:       make(chan bool, 1),
+		readyChan:  make(chan bool, 1),
 	}
 
 	// apply functional options
@@ -49,11 +48,17 @@ func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd)
 		m = f(m)
 	}
 
+	// Stdout and Stderr are set to the MonitoredCmd (which satisfies io.Writer)
+	// to intercept outputs and determine if a command has reached its "ready
+	// state"
+	c.Stdout = m
+	c.Stderr = m
+
 	return m
 }
 
-// BashShell is a functional option to change the executing shell to zsh
-func BashShell(m MonitoredCmd) MonitoredCmd {
+// SetBashShell is a functional option to change the executing shell to zsh
+func SetBashShell(m MonitoredCmd) MonitoredCmd {
 	m.command.Args[0] = "bash"
 	resolvedPath, err := exec.LookPath("bash")
 	if err != nil {
@@ -79,21 +84,28 @@ func SetCmdDir(dir string) func(MonitoredCmd) MonitoredCmd {
 	}
 }
 
-// SilenceOutput sets the command's Stdout and Stderr to nil
+// SetSilenceOutput sets the command's Stdout and Stderr to nil
 // so no output will be seen in the terminal
-func SilenceOutput(m MonitoredCmd) MonitoredCmd {
-	m.command.Stdout = nil
-	m.command.Stderr = nil
+func SetSilenceOutput(m MonitoredCmd) MonitoredCmd {
+	m.silenceOutput = true
 	return m
 }
 
-// PrefixStdout is a functional option that changes a monitored command's
-// Stdout and Stderr writes to start all newlines with the given prefix
-func PrefixStdout(prefix string) func(MonitoredCmd) MonitoredCmd {
+// SetCmdName is a functional option that sets a monitored command's name,
+// which is used to prefix each line written to Stdout
+func SetCmdName(name string) func(MonitoredCmd) MonitoredCmd {
 	return func(m MonitoredCmd) MonitoredCmd {
-		prefixedStdout := writer.NewPrefixedStdout(prefix)
-		m.command.Stdout = prefixedStdout
-		m.command.Stderr = prefixedStdout
+		m.name = name
+		return m
+	}
+}
+
+// SetReadyPattern is a functional option that takes in a pattern string
+// that must compile into a valid regexp and sets it to monitored command's
+// readyPattern field
+func SetReadyPattern(pattern string) func(MonitoredCmd) MonitoredCmd {
+	return func(m MonitoredCmd) MonitoredCmd {
+		m.readyPattern = regexp.MustCompile(pattern)
 		return m
 	}
 }
@@ -101,34 +113,81 @@ func PrefixStdout(prefix string) func(MonitoredCmd) MonitoredCmd {
 // Run will run the underlying command. This function is blocking
 // until the command is done or is interrupted
 // It can be interrupted via the Interrupt receiver method
-func (m MonitoredCmd) Run() error {
-	// when the function returns, write to the done channel to cleanup goroutines
-	defer func() {
-		m.done <- true
-	}()
+func (m *MonitoredCmd) Run() error {
+	// channel to cleanup goroutines if command completes
+	done := make(chan bool, 1)
 
 	// start the command's execution
 	if err := m.command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}
 
-	// go routine that will listen for either an interrupt signal or the command to end naturally
+	// listen for either an interrupt signal or the command to end naturally
 	go func() {
 		select {
 		case sig := <-m.signalChan:
 			syscall.Kill(-m.command.Process.Pid, sig)
-			close(m.signalChan)
-		case <-m.done:
-			close(m.done)
+		case <-done:
 		}
 	}()
 
+	// mark the ready field as true when readyChan is written to
+	go func() {
+		<-m.readyChan
+		m.ready = true
+	}()
+
+	// if command ends naturally, mark ready as true
 	err := m.command.Wait()
-	m.finished = true
+	m.readyChan <- true
+	done <- true
 	return err
 }
 
 // Interrupt will send an interrupt signal to the process
 func (m MonitoredCmd) Interrupt() {
 	m.signalChan <- syscall.SIGINT
+}
+
+// Write satisfies the Writer interface, so that MonitoredCmd itself can be used
+// for exec.Cmc.Stdout and Stderr
+// Write "intercepts" writes to Stdout/Stderr to check if the outputs match a
+// regexp and determines if a command has reached its "ready state"
+// the ready state is used elsewhere coordinate dependent commands
+func (m MonitoredCmd) Write(in []byte) (int, error) {
+	if m.readyPattern != nil && m.readyPattern.Match(in) {
+		m.readyChan <- true
+	}
+
+	if m.silenceOutput {
+		return len(in), nil
+	}
+
+	// if no name is set, just write straight to stdout
+	var err error
+	if m.name == "" {
+		_, err = os.Stdout.Write(in)
+	} else {
+		// if command's name is set, print with prefixed outputs
+		prefixed := prefixEveryline(string(in), m.name)
+		_, err = os.Stdout.Write([]byte(prefixed))
+	}
+
+	return len(in), err
+}
+
+// prefixEachLine adds a given prefix with a bar/pipe " | " to each newline
+func prefixEveryline(in, prefix string) (out string) {
+	lines := strings.Split(in, "\n")
+
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	return prefix + " | " + strings.Join(lines, fmt.Sprintf("\n%s | ", prefix)) + "\n"
+}
+
+// IsReady is a simple getter for the ready state of a monitored command
+func (m *MonitoredCmd) IsReady() bool {
+	return m.ready
 }

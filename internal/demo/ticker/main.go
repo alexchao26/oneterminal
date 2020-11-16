@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -9,6 +11,9 @@ import (
 // it was used in developing demo.go and the monitor API
 func main() {
 	var runs int
+	if os.Getenv("SKIP") != "" {
+		runs, _ = strconv.Atoi(os.Getenv("SKIP"))
+	}
 	for runs < 30 {
 		fmt.Println("tick", runs)
 		time.Sleep(time.Second * 1)

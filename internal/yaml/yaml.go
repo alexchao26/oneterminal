@@ -28,10 +28,11 @@ type OneTerminalConfig struct {
 
 // Command is what will run in one terminal "window"/tab
 type Command struct {
-	Name    string `yaml:"name"`
-	Command string `yaml:"command"`
-	CmdDir  string `yaml:"directory,omitempty"`
-	Silence bool   `yaml:"silence"`
+	Name        string `yaml:"name"`
+	Command     string `yaml:"command"`
+	CmdDir      string `yaml:"directory,omitempty"`
+	Silence     bool   `yaml:"silence"`
+	ReadyRegexp string `yaml:"ready-regexp"`
 }
 
 var reservedNames = map[string]bool{
@@ -78,21 +79,25 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 				for _, cmd := range config.Commands {
 					var options []func(monitor.MonitoredCmd) monitor.MonitoredCmd
 					if cmd.Name != "" {
-						options = append(options, monitor.PrefixStdout(cmd.Name))
+						options = append(options, monitor.SetCmdName(cmd.Name))
 					}
 					if config.Shell == "bash" {
-						options = append(options, monitor.BashShell)
+						options = append(options, monitor.SetBashShell)
 					}
 					if cmd.CmdDir != "" {
 						options = append(options, monitor.SetCmdDir(cmd.CmdDir))
 					}
 					if cmd.Silence {
-						options = append(options, monitor.SilenceOutput)
+						options = append(options, monitor.SetSilenceOutput)
 					}
+					if cmd.ReadyRegexp != "" {
+						options = append(options, monitor.SetReadyPattern(cmd.ReadyRegexp))
+					}
+					// TODO dependency parsing
 
 					monitoredCmd := monitor.NewMonitoredCmd(cmd.Command, options...)
 
-					Orchestrator.AddCommands(monitoredCmd)
+					Orchestrator.AddCommands(&monitoredCmd)
 				}
 
 				Orchestrator.RunCommands()
