@@ -37,10 +37,10 @@ Note: Installation via brew is in the works.
 ## Utilizing the example config generator
 `oneterminal example` will create a config at ~/.config/oneterminal/example.yml containing helpful comments about each yaml field
 ```yaml
-# The name of the command, it cannot have special characters
+# The name of the command. Alphanumeric, dash and hypens are accepted
 name: somename
 
-# shell to use, zsh and bash are supported
+# shell to use (zsh|bash), defaults to zsh
 shell: zsh
 
 # a short description of what this command does
@@ -48,24 +48,58 @@ short: an example command that says hello twice
 # OPTIONAL: longer description of what this command does
 long: Optional longer description
 
-# commands are made of
-#   1. command string (the command to run, will be expanded via os.ExpandEnv)
-#   2. name string, text to prefix each line of this command's output
-#      NOTE: an empty string is a valid name and is useful for things like vault
-#            which write to stdout in small chunks
-#   3. directory string (optional), what directory to run the command from
-#      NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
-#   4. silence boolean (optional: default false), if true will silence that command's output
+# An array of commands, each command consists of:
+#   1. command {string}: the command to run directly in a shell
+#   2. name {string default: ""}: used to prefix each line of this command's
+#        output AND for other commands to list dependencies
+#        NOTE: an empty string is a valid name and is useful for things like
+#           vault which write to stdout in small chunks
+#   3. directory {string, default: $HOME}: what directory to run the command in
+#        NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
+#   4. silence {boolean, default: false}, silence this command's output?
+#   5. depends-on {[]string}: which (names of) commands to wait for
+#   6. ready-regexp {string, optional}: a regular expression that the outputs
+#        must match for this command to be considered "ready" and for its
+#        dependants to begin running
 commands:
 - name: greeter-1
   command: echo hello from window 1
   directory: $HOME/go
+  ready-regexp: "window [0-9]"
   silence: false
 - name: greeter-2
   command: echo hello from window 2
   silence: false
+  depends-on:
+  - greeter-1
 - name: ""
   command: echo "they silenced me :'("
+  silence: true
+```
+
+This is an example of a slightly more complex configuration that calls a ticker program (in the [examples folder](./examples/ticker/main.go))
+```yml
+name: tick
+short: a few tickers that rely on each other
+commands:
+- name: ticker-UNO
+  command: go run main.go
+  ready-regexp: "tick [5-9]"
+  directory: $HOME/go/src/github.com/alexchao26/oneterminal/examples/ticker
+- name: ticker-two
+  command: SECONDS=3 go run main.go
+  directory: $HOME/go/src/github.com/alexchao26/oneterminal/examples/ticker
+  depends-on:
+    - ticker-UNO
+- name: ticker-3
+  command: go run main.go
+  directory: $HOME/go/src/github.com/alexchao26/oneterminal/examples/ticker
+  depends-on:
+    - silent-ticker
+    - ticker-two
+- name: silent-ticker
+  command: go run main.go
+  directory: $HOME/go/src/github.com/alexchao26/oneterminal/examples/ticker
   silence: true
 ```
 
@@ -76,6 +110,8 @@ Run `oneterminal help` to see this command show up under available commands. Not
 `oneterminal example`: Makes a demo oneterminal config in ~/.config/oneterminal
 
 `oneterminal completion --help`: Get helper text to setup shell completion for zsh or bash shells
+
+`oneterminal version`: Print the version number of oneterminal
 
 `oneterminal help`: Help about any command
 
