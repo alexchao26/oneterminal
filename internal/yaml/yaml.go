@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/alexchao26/oneterminal/pkg/monitor"
+	"github.com/alexchao26/oneterminal/internal/monitor"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
