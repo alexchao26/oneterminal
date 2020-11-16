@@ -36,7 +36,6 @@ func (orch *Orchestrator) AddCommands(commands ...*MonitoredCmd) {
 // RunCommands will run all of the added commands and block until they have all
 // finished running. The can occur from the processes ending naturally
 // or being interrupted
-// TODO - timing of when to run each command?
 func (orch *Orchestrator) RunCommands() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
@@ -46,25 +45,27 @@ func (orch *Orchestrator) RunCommands() {
 		orch.SendInterrupt()
 	}()
 
+	namesToCmds := make(map[string]*MonitoredCmd)
+	for _, cmd := range orch.commands {
+		namesToCmds[cmd.name] = cmd
+	}
+
 	for _, cmd := range orch.commands {
 		orch.wg.Add(1)
 		go func(cmd *MonitoredCmd) {
-			err := cmd.Run()
-			if err != nil {
-				fmt.Println(err)
-			}
-			orch.wg.Done()
-		}(cmd)
-
-		// todo-cleanup remove this logging goroutine after finishing dependency feature
-		go func(cmd *MonitoredCmd) {
-			ticker := time.NewTicker(time.Second * 3)
+			ticker := time.NewTicker(time.Millisecond * 100)
 			for {
-				select {
-				case <-ticker.C:
-					fmt.Printf("  %s: %v\n", cmd.name, cmd.IsReady())
+				<-ticker.C
+				if checkDependencies(cmd, namesToCmds) {
+					err := cmd.Run()
+					if err != nil {
+						fmt.Println(err)
+					}
+					break
 				}
 			}
+
+			orch.wg.Done()
 		}(cmd)
 	}
 
@@ -76,4 +77,13 @@ func (orch *Orchestrator) SendInterrupt() {
 	for _, cmd := range orch.commands {
 		cmd.Interrupt()
 	}
+}
+
+func checkDependencies(m *MonitoredCmd, allCmdsMap map[string]*MonitoredCmd) bool {
+	for _, dep := range m.dependsOn {
+		if !allCmdsMap[dep].IsReady() {
+			return false
+		}
+	}
+	return true
 }

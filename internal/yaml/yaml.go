@@ -28,11 +28,12 @@ type OneTerminalConfig struct {
 
 // Command is what will run in one terminal "window"/tab
 type Command struct {
-	Name        string `yaml:"name"`
-	Command     string `yaml:"command"`
-	CmdDir      string `yaml:"directory,omitempty"`
-	Silence     bool   `yaml:"silence"`
-	ReadyRegexp string `yaml:"ready-regexp"`
+	Name        string   `yaml:"name"`
+	Command     string   `yaml:"command"`
+	CmdDir      string   `yaml:"directory,omitempty"`
+	Silence     bool     `yaml:"silence,omitempty"`
+	ReadyRegexp string   `yaml:"ready-regexp,omitempty"`
+	DependsOn   []string `yaml:"depends-on,omitempty"`
 }
 
 var reservedNames = map[string]bool{
@@ -93,7 +94,9 @@ func ParseAndAddToRoot(rootCmd *cobra.Command) {
 					if cmd.ReadyRegexp != "" {
 						options = append(options, monitor.SetReadyPattern(cmd.ReadyRegexp))
 					}
-					// TODO dependency parsing
+					if len(cmd.DependsOn) != 0 {
+						options = append(options, monitor.SetDependsOn(cmd.DependsOn))
+					}
 
 					monitoredCmd := monitor.NewMonitoredCmd(cmd.Command, options...)
 
@@ -180,17 +183,20 @@ hello to you multiple times.
 Some say you can hear it from space.`,
 		Commands: []Command{
 			{
-				Name:    "greeter-1",
-				Command: "echo hello from window 1",
-				CmdDir:  "$HOME/go",
-				Silence: false,
+				Name:        "greeter-1",
+				Command:     "echo hello from window 1",
+				CmdDir:      "$HOME/go",
+				Silence:     false,
+				ReadyRegexp: "",
 			}, {
-				Name:    "greeter-2",
-				Command: "echo hello from window 2",
-				Silence: false,
+				Name:        "greeter-2",
+				Command:     "echo hello from window 2",
+				Silence:     false,
+				ReadyRegexp: "window [0-9]",
+				DependsOn:   []string{"greeter-1"},
 			}, {
 				Name:    "",
-				Command: "echo they silenced me :(",
+				Command: "echo I am silent",
 				Silence: true,
 			},
 		},
@@ -202,7 +208,7 @@ Some say you can hear it from space.`,
 	}
 
 	// write to a file
-	err = ioutil.WriteFile(filepath.Join(oneTermConfigDir, "generated-example.yml"), bytes, os.ModePerm)
+	err = ioutil.WriteFile(oneTermConfigDir+"/generated-example.yml", bytes, os.ModePerm)
 	if err != nil {
 		return errors.Wrap(err, "writing to example config file")
 	}
@@ -220,10 +226,10 @@ func MakeExampleConfigFromStructWithInstructions() error {
 
 	err = ioutil.WriteFile(
 		oneTermConfigDir+"/example.yml",
-		[]byte(`# The name of the command, it cannot have special characters
+		[]byte(`# The name of the command. Alphanumeric, dash and hypens are accepted
 name: somename
 
-# shell to use, zsh and bash are supported
+# shell to use (zsh|bash), defaults to zsh
 shell: zsh
 
 # a short description of what this command does
@@ -231,22 +237,30 @@ short: an example command that says hello twice
 # OPTIONAL: longer description of what this command does
 long: Optional longer description
 
-# commands are made of
-#   1. command string (the command to run, will be expanded via os.ExpandEnv)
-#   2. name string, text to prefix each line of this command's output
-#      NOTE: an empty string is a valid name and is useful for things like vault
-#            which write to stdout in small chunks
-#   3. directory string (optional), what directory to run the command from
-#      NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
-#   4. silence boolean (optional: default false), if true will silence that command's output
+# An array of commands, each command consists of:
+#   1. command {string}: the command to run directly in a shell
+#   2. name {string default: ""}: used to prefix each line of this command's
+#        output AND for other commands to list dependencies
+#        NOTE: an empty string is a valid name and is useful for things like
+#           vault which write to stdout in small chunks
+#   3. directory {string, default: $HOME}: what directory to run the command in
+#        NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
+#   4. silence {boolean, default: false}, silence this command's output?
+#   5. depends-on {[]string}: which (names of) commands to wait for
+#   6. ready-regexp {string, optional}: a regular expression that the outputs
+#        must match for this command to be considered "ready" and for its
+#        dependants to begin running
 commands:
 - name: greeter-1
   command: echo hello from window 1
   directory: $HOME/go
+  ready-regexp: "window [0-9]"
   silence: false
 - name: greeter-2
   command: echo hello from window 2
   silence: false
+  depends-on:
+  - greeter-1
 - name: ""
   command: echo "they silenced me :'("
   silence: true
