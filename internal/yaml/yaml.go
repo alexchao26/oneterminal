@@ -27,12 +27,13 @@ type OneTerminalConfig struct {
 
 // Command is what will run in one terminal "window"/tab
 type Command struct {
-	Name        string   `yaml:"name"`
-	Command     string   `yaml:"command"`
-	CmdDir      string   `yaml:"directory,omitempty"`
-	Silence     bool     `yaml:"silence,omitempty"`
-	ReadyRegexp string   `yaml:"ready-regexp,omitempty"`
-	DependsOn   []string `yaml:"depends-on,omitempty"`
+	Name        string            `yaml:"name"`
+	Command     string            `yaml:"command"`
+	CmdDir      string            `yaml:"directory,omitempty"`
+	Silence     bool              `yaml:"silence,omitempty"`
+	ReadyRegexp string            `yaml:"ready-regexp,omitempty"`
+	DependsOn   []string          `yaml:"depends-on,omitempty"`
+	Environment map[string]string `yaml:"environment,omitempty"`
 }
 
 // ParseAllConfigs will parse each file in ~/.config/oneterminal
@@ -52,11 +53,11 @@ func ParseAllConfigs() ([]OneTerminalConfig, error) {
 	}
 
 	for _, f := range files {
-		filename := fmt.Sprintf("%s/%s", configDir, f.Name())
-
 		if !strings.HasSuffix(f.Name(), ".yml") {
 			continue
 		}
+
+		filename := fmt.Sprintf("%s/%s", configDir, f.Name())
 
 		bytes, err := ioutil.ReadFile(filename)
 		if err != nil {
@@ -142,10 +143,11 @@ Some say you can hear it from space.`,
 				ReadyRegexp: "",
 			}, {
 				Name:        "greeter-2",
-				Command:     "echo hello from window 2",
+				Command:     "echo hello $PERSON",
 				Silence:     false,
 				ReadyRegexp: "window [0-9]",
 				DependsOn:   []string{"greeter-1"},
+				Environment: map[string]string{"PERSON": "alex"},
 			}, {
 				Name:    "",
 				Command: "echo I am silent",
@@ -198,10 +200,11 @@ long: Optional longer description
 #   3. directory {string, default: $HOME}: what directory to run the command in
 #        NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
 #   4. silence {boolean, default: false}, silence this command's output?
-#   5. depends-on {[]string}: which (names of) commands to wait for
+#   5. depends-on {[]string, optional}: which (names of) commands to wait for
 #   6. ready-regexp {string, optional}: a regular expression that the outputs
 #        must match for this command to be considered "ready" and for its
 #        dependants to begin running
+#   7. environment {map[string]string, optional} to set environment variables
 commands:
 - name: greeter-1
   command: echo hello from window 1

@@ -203,12 +203,27 @@ func SetReadyPattern(pattern string) func(MonitoredCmd) MonitoredCmd {
 	}
 }
 
-// SetDependsOn is an optional parameter that sets a slice of dependencies
+// SetDependsOn is a functional option that sets a slice of dependencies
 // for this command. The dependencies are names of commands that need to be done
 // or ready prior to this command starting
 func SetDependsOn(cmdNames []string) func(MonitoredCmd) MonitoredCmd {
 	return func(m MonitoredCmd) MonitoredCmd {
 		m.dependsOn = cmdNames
+		return m
+	}
+}
+
+// SetEnvironment is a functional option that adds export commands to the start
+// of a command
+func SetEnvironment(envMap map[string]string) func(MonitoredCmd) MonitoredCmd {
+	var envSlice []string
+	for k, v := range envMap {
+		envSlice = append(envSlice, k+"="+v)
+	}
+
+	exportString := "export " + strings.Join(envSlice, " && export ") + " && "
+	return func(m MonitoredCmd) MonitoredCmd {
+		m.command.Args[2] = exportString + m.command.Args[2]
 		return m
 	}
 }

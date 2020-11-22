@@ -109,6 +109,9 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 					if len(cmd.DependsOn) != 0 {
 						options = append(options, monitor.SetDependsOn(cmd.DependsOn))
 					}
+					if cmd.Environment != nil {
+						options = append(options, monitor.SetEnvironment(cmd.Environment))
+					}
 
 					monitoredCmd := monitor.NewMonitoredCmd(cmd.Command, options...)
 

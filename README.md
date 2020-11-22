@@ -57,10 +57,11 @@ long: Optional longer description
 #   3. directory {string, default: $HOME}: what directory to run the command in
 #        NOTE: use $HOME, not ~. This strings gets passed through os.ExpandEnv
 #   4. silence {boolean, default: false}, silence this command's output?
-#   5. depends-on {[]string}: which (names of) commands to wait for
+#   5. depends-on {[]string, optional}: which (names of) commands to wait for
 #   6. ready-regexp {string, optional}: a regular expression that the outputs
 #        must match for this command to be considered "ready" and for its
 #        dependants to begin running
+#   7. environment {map[string]string, optional} to set environment variables
 commands:
 - name: greeter-1
   command: echo hello from window 1
@@ -97,6 +98,8 @@ commands:
   depends-on:
     - silent-ticker
     - ticker-two
+  environment:
+    SECONDS: 8
 - name: silent-ticker
   command: go run main.go
   directory: $HOME/go/src/github.com/alexchao26/oneterminal/examples/ticker
