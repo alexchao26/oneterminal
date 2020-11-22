@@ -18,6 +18,7 @@ import (
 type MonitoredCmd struct {
 	command       *exec.Cmd
 	name          string
+	ansiColor     string
 	silenceOutput bool
 	signalChan    chan syscall.Signal
 	ready         bool           // if command's dependent's can begin
@@ -118,7 +119,7 @@ func (m MonitoredCmd) Write(in []byte) (int, error) {
 		_, err = os.Stdout.Write(in)
 	} else {
 		// if command's name is set, print with prefixed outputs
-		prefixed := prefixEveryline(string(in), m.name)
+		prefixed := prefixEveryline(string(in), fmt.Sprintf("%s%s%s", m.ansiColor, m.name, "\033[0m"))
 		_, err = os.Stdout.Write([]byte(prefixed))
 	}
 
@@ -180,6 +181,14 @@ func SetSilenceOutput(m MonitoredCmd) MonitoredCmd {
 func SetCmdName(name string) func(MonitoredCmd) MonitoredCmd {
 	return func(m MonitoredCmd) MonitoredCmd {
 		m.name = name
+		return m
+	}
+}
+
+// SetColor is a functional option that sets the ansiColor for the outputs
+func SetColor(terminalColor string) func(MonitoredCmd) MonitoredCmd {
+	return func(m MonitoredCmd) MonitoredCmd {
+		m.ansiColor = terminalColor
 		return m
 	}
 }

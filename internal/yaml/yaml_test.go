@@ -69,7 +69,7 @@ func TestMakeExampleConfigFromStructWithInstructions(t *testing.T) {
 func TestParseConfigs1(t *testing.T) {
 	// add at least one config
 	MakeExampleConfigFromStruct()
-	configs, err := ParseConfigs()
+	configs, err := ParseAllConfigs()
 	if err != nil {
 		t.Errorf("Did not expect error, got %s", err)
 	}

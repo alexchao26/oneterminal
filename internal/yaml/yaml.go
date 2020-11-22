@@ -5,10 +5,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/alexchao26/oneterminal/internal/monitor"
 	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
 
@@ -36,88 +35,10 @@ type Command struct {
 	DependsOn   []string `yaml:"depends-on,omitempty"`
 }
 
-var reservedNames = map[string]bool{
-	"completion": true,
-	"example":    true,
-	"help":       true,
-}
-
-// ParseAndAddToRoot will be invoked when oneterminal starts
-// to parse all the config files from ~/.config/oneterminal/*.yml
-// and add those commands to the root command
-func ParseAndAddToRoot(rootCmd *cobra.Command) {
-	// Parse all command configurations
-	cmdConfigs, err := ParseConfigs()
-	if err != nil {
-		panic(fmt.Sprintf("Reading configs %s", err))
-	}
-
-	// disallow commands with the same name
-	allNames := make(map[string]bool)
-
-	for _, configPointer := range cmdConfigs {
-		// this assignment to config is needed because ranging for loop assign a
-		// pointer that iterates thorugh a slice, i.e. all commands would end up
-		// being overwritten with the last config/element in the slice
-		config := configPointer
-		if allNames[config.Name] {
-			panic(fmt.Sprintf("Multiple commands have the same name %s", config.Name))
-		}
-		allNames[config.Name] = true
-
-		if reservedNames[config.Name] {
-			panic(fmt.Sprintf("The command name %q is reserved :(", config.Name))
-		}
-
-		// create the final cobra command and add it to the root command
-		cobraCommand := &cobra.Command{
-			Use:   config.Name,
-			Short: config.Short,
-			Run: func(cmd *cobra.Command, args []string) {
-				// Setup Orchestrator and its commands
-				Orchestrator := monitor.NewOrchestrator()
-
-				for _, cmd := range config.Commands {
-					var options []func(monitor.MonitoredCmd) monitor.MonitoredCmd
-					if cmd.Name != "" {
-						options = append(options, monitor.SetCmdName(cmd.Name))
-					}
-					if config.Shell == "bash" {
-						options = append(options, monitor.SetBashShell)
-					}
-					if cmd.CmdDir != "" {
-						options = append(options, monitor.SetCmdDir(cmd.CmdDir))
-					}
-					if cmd.Silence {
-						options = append(options, monitor.SetSilenceOutput)
-					}
-					if cmd.ReadyRegexp != "" {
-						options = append(options, monitor.SetReadyPattern(cmd.ReadyRegexp))
-					}
-					if len(cmd.DependsOn) != 0 {
-						options = append(options, monitor.SetDependsOn(cmd.DependsOn))
-					}
-
-					monitoredCmd := monitor.NewMonitoredCmd(cmd.Command, options...)
-
-					Orchestrator.AddCommands(&monitoredCmd)
-				}
-
-				Orchestrator.RunCommands()
-			},
-		}
-		if config.Long != "" {
-			cobraCommand.Long = config.Long
-		}
-
-		rootCmd.AddCommand(cobraCommand)
-	}
-}
-
-// ParseConfigs will parse each file in ~/.config/oneterminal
+// ParseAllConfigs will parse each file in ~/.config/oneterminal
 // into a slice.
 // Configs are expected to have
-func ParseConfigs() ([]OneTerminalConfig, error) {
+func ParseAllConfigs() ([]OneTerminalConfig, error) {
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return nil, err
@@ -132,6 +53,11 @@ func ParseConfigs() ([]OneTerminalConfig, error) {
 
 	for _, f := range files {
 		filename := fmt.Sprintf("%s/%s", configDir, f.Name())
+
+		if !strings.HasSuffix(f.Name(), ".yml") {
+			continue
+		}
+
 		bytes, err := ioutil.ReadFile(filename)
 		if err != nil {
 			return nil, errors.Wrapf(err, "reading file %s", filename)
@@ -162,6 +88,32 @@ func GetConfigDir() (string, error) {
 		return "", err
 	}
 	return oneTermConfigDir, nil
+}
+
+// HasNameCollisions ensures there are no duplicate names and doesn't use
+// reserved names
+func HasNameCollisions(configs []OneTerminalConfig) bool {
+	reservedNames := map[string]bool{
+		"completion": true,
+		"example":    true,
+		"help":       true,
+	}
+
+	allNames := make(map[string]bool)
+	for _, config := range configs {
+		if allNames[config.Name] {
+			fmt.Printf("duplicate command name used %s\n", config.Name)
+			return true
+		}
+		allNames[config.Name] = true
+
+		if reservedNames[config.Name] {
+			fmt.Printf("reserved name used %s\n", config.Name)
+			return true
+		}
+	}
+
+	return false
 }
 
 // MakeExampleConfigFromStruct will generate an example config file in the
