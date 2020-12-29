@@ -115,7 +115,7 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 
 					monitoredCmd := monitor.NewMonitoredCmd(cmd.Command, options...)
 
-					Orchestrator.AddCommands(&monitoredCmd)
+					Orchestrator.AddCommands(monitoredCmd)
 				}
 
 				Orchestrator.RunCommands()

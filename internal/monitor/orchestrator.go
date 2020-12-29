@@ -59,7 +59,7 @@ func (orch *Orchestrator) RunCommands() {
 				if checkDependencies(cmd, namesToCmds) {
 					err := cmd.Run()
 					if err != nil {
-						fmt.Println(err)
+						panic(fmt.Sprintf("Error running command %s: %s", cmd.name, err))
 					}
 					break
 				}

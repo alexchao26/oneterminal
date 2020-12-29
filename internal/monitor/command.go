@@ -23,7 +23,6 @@ type MonitoredCmd struct {
 	signalChan    chan syscall.Signal
 	ready         bool           // if command's dependent's can begin
 	readyPattern  *regexp.Regexp // pattern to match against command outputs
-	readyChan     chan bool      // channel needed to get around no pointer receiver on Write method
 	dependsOn     []string
 }
 
@@ -32,7 +31,7 @@ type MonitoredCmd struct {
 // Interrupt method
 // Default shell used is zsh, use functional options to change
 // e.g. monitor.NewMonitoredCmd("echo hello", monitor.SetBashShell)
-func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd) MonitoredCmd {
+func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd) *MonitoredCmd {
 	c := exec.Command("zsh", "-c", command)
 
 	// SysProcAttr sets the child process's PID to the parent's PID
@@ -42,7 +41,6 @@ func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd)
 	m := MonitoredCmd{
 		command:    c,
 		signalChan: make(chan syscall.Signal, 1),
-		readyChan:  make(chan bool, 1),
 	}
 
 	// apply functional options
@@ -53,10 +51,10 @@ func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd)
 	// Stdout and Stderr are set to the MonitoredCmd (which satisfies io.Writer)
 	// to intercept outputs and determine if a command has reached its "ready
 	// state"
-	c.Stdout = m
-	c.Stderr = m
+	c.Stdout = &m
+	c.Stderr = &m
 
-	return m
+	return &m
 }
 
 // Run will run the underlying command. This function is blocking
@@ -80,22 +78,14 @@ func (m *MonitoredCmd) Run() error {
 		}
 	}()
 
-	go func() {
-		// read in an infinite loop so Write's regexp check does not block
-		for {
-			<-m.readyChan
-			m.ready = true
-		}
-	}()
-
 	err := m.command.Wait()
-	m.readyChan <- true
+	m.ready = true
 	done <- true
 	return err
 }
 
 // Interrupt will send an interrupt signal to the process
-func (m MonitoredCmd) Interrupt() {
+func (m *MonitoredCmd) Interrupt() {
 	m.signalChan <- syscall.SIGINT
 }
 
@@ -104,9 +94,9 @@ func (m MonitoredCmd) Interrupt() {
 // Write "intercepts" writes to Stdout/Stderr to check if the outputs match a
 // regexp and determines if a command has reached its "ready state"
 // the ready state is used elsewhere coordinate dependent commands
-func (m MonitoredCmd) Write(in []byte) (int, error) {
+func (m *MonitoredCmd) Write(in []byte) (int, error) {
 	if m.readyPattern != nil && m.readyPattern.Match(in) {
-		m.readyChan <- true
+		m.ready = true
 	}
 
 	if m.silenceOutput {
@@ -154,9 +144,8 @@ func SetBashShell(m MonitoredCmd) MonitoredCmd {
 	return m
 }
 
-// SetCmdDir is a functional option that adds a Dir
-// property to the underlying command. Dir is the directory
-// to execute the command in
+// SetCmdDir is a functional option that adds a Dir property to the underlying
+// command. Dir is the directory to execute the command from
 func SetCmdDir(dir string) func(MonitoredCmd) MonitoredCmd {
 	return func(m MonitoredCmd) MonitoredCmd {
 		expandedDir := os.ExpandEnv(dir)
@@ -169,8 +158,8 @@ func SetCmdDir(dir string) func(MonitoredCmd) MonitoredCmd {
 	}
 }
 
-// SetSilenceOutput sets the command's Stdout and Stderr to nil
-// so no output will be seen in the terminal
+// SetSilenceOutput sets the command's Stdout and Stderr to nil so no output
+// will be seen in the terminal
 func SetSilenceOutput(m MonitoredCmd) MonitoredCmd {
 	m.silenceOutput = true
 	return m
