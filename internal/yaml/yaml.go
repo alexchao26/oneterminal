@@ -170,9 +170,9 @@ Some say you can hear it from space.`,
 	return nil
 }
 
-// MakeExampleConfigFromStructWithInstructions writes an example oneterminal yaml config
+// MakeExampleConfigWithInstructions writes an example oneterminal yaml config
 // to ~/.config/oneterminal/example.yml with helpful comments
-func MakeExampleConfigFromStructWithInstructions() error {
+func MakeExampleConfigWithInstructions() error {
 	oneTermConfigDir, err := GetConfigDir()
 	if err != nil {
 		return err

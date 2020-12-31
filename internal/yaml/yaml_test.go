@@ -47,8 +47,8 @@ func TestMakeExampleConfigFromStruct(t *testing.T) {
 	os.Remove(filepath)
 }
 
-func TestMakeExampleConfigFromStructWithInstructions(t *testing.T) {
-	err := MakeExampleConfigFromStructWithInstructions()
+func TestMakeExampleConfigWithInstructions(t *testing.T) {
+	err := MakeExampleConfigWithInstructions()
 	if err != nil {
 		t.Errorf("Did not expect error, got error %s", err)
 	}

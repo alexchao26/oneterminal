@@ -12,8 +12,10 @@ import (
 // Orchestrator uses a channel for commands to communicate their donness
 // and has a mutex to prevent races against a pendingCmdCount
 type Orchestrator struct {
-	commands []*MonitoredCmd
-	wg       sync.WaitGroup
+	commands      []*MonitoredCmd
+	isInterrupted bool
+	mut           sync.RWMutex
+	wg            sync.WaitGroup
 }
 
 // NewOrchestrator makes a new Orchestrator
@@ -42,7 +44,10 @@ func (orch *Orchestrator) RunCommands() {
 
 	go func() {
 		<-signalChan
-		orch.SendInterrupt()
+		orch.mut.Lock()
+		orch.isInterrupted = true
+		orch.mut.Unlock()
+		orch.SendInterrupts()
 	}()
 
 	namesToCmds := make(map[string]*MonitoredCmd)
@@ -54,17 +59,26 @@ func (orch *Orchestrator) RunCommands() {
 		orch.wg.Add(1)
 		go func(cmd *MonitoredCmd) {
 			ticker := time.NewTicker(time.Millisecond * 100)
+			// on every tick. check if entire orchestrator has been interrupted
+			// then check dependencies of of this command, run it if unblocked
 			for {
 				<-ticker.C
+
+				orch.mut.RLock()
+				if orch.isInterrupted {
+					orch.mut.RUnlock()
+					break
+				}
+				orch.mut.RUnlock()
+
 				if checkDependencies(cmd, namesToCmds) {
 					err := cmd.Run()
 					if err != nil {
-						panic(fmt.Sprintf("Error running command %s: %s", cmd.name, err))
+						fmt.Println(err)
 					}
 					break
 				}
 			}
-
 			orch.wg.Done()
 		}(cmd)
 	}
@@ -72,8 +86,8 @@ func (orch *Orchestrator) RunCommands() {
 	orch.wg.Wait()
 }
 
-// SendInterrupt will relay an interrupt signal to all underlying commands
-func (orch *Orchestrator) SendInterrupt() {
+// SendInterrupts will relay an interrupt signal to all underlying commands
+func (orch *Orchestrator) SendInterrupts() {
 	for _, cmd := range orch.commands {
 		cmd.Interrupt()
 	}

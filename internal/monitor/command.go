@@ -20,7 +20,6 @@ type MonitoredCmd struct {
 	name          string
 	ansiColor     string
 	silenceOutput bool
-	signalChan    chan syscall.Signal
 	ready         bool           // if command's dependent's can begin
 	readyPattern  *regexp.Regexp // pattern to match against command outputs
 	dependsOn     []string
@@ -34,13 +33,8 @@ type MonitoredCmd struct {
 func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd) *MonitoredCmd {
 	c := exec.Command("zsh", "-c", command)
 
-	// SysProcAttr sets the child process's PID to the parent's PID
-	// making the process identifiable if it needs to be interrupted
-	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
 	m := MonitoredCmd{
-		command:    c,
-		signalChan: make(chan syscall.Signal, 1),
+		command: c,
 	}
 
 	// apply functional options
@@ -48,9 +42,6 @@ func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd)
 		m = f(m)
 	}
 
-	// Stdout and Stderr are set to the MonitoredCmd (which satisfies io.Writer)
-	// to intercept outputs and determine if a command has reached its "ready
-	// state"
 	c.Stdout = &m
 	c.Stderr = &m
 
@@ -61,39 +52,28 @@ func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd)
 // until the command is done or is interrupted
 // It can be interrupted via the Interrupt receiver method
 func (m *MonitoredCmd) Run() error {
-	// channel to cleanup goroutines if command completes
-	done := make(chan bool, 1)
-
 	// start the command's execution
 	if err := m.command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}
 
-	// listen for either an interrupt signal or the command to end naturally
-	go func() {
-		select {
-		case sig := <-m.signalChan:
-			syscall.Kill(-m.command.Process.Pid, sig)
-		case <-done:
-		}
-	}()
-
 	err := m.command.Wait()
 	m.ready = true
-	done <- true
 	return err
 }
 
 // Interrupt will send an interrupt signal to the process
 func (m *MonitoredCmd) Interrupt() {
-	m.signalChan <- syscall.SIGINT
+	if m.command.Process != nil {
+		m.command.Process.Signal(syscall.SIGINT)
+	}
 }
 
-// Write satisfies the Writer interface, so that MonitoredCmd itself can be used
-// for exec.Cmc.Stdout and Stderr
+// Write implements io.Writer, so that MonitoredCmd itself can be used for
+// exec.Cmd.Stdout and Stderr
 // Write "intercepts" writes to Stdout/Stderr to check if the outputs match a
 // regexp and determines if a command has reached its "ready state"
-// the ready state is used elsewhere coordinate dependent commands
+// the ready state is used by Orchestrator to coordinate dependent commands
 func (m *MonitoredCmd) Write(in []byte) (int, error) {
 	if m.readyPattern != nil && m.readyPattern.Match(in) {
 		m.ready = true
@@ -203,7 +183,8 @@ func SetDependsOn(cmdNames []string) func(MonitoredCmd) MonitoredCmd {
 }
 
 // SetEnvironment is a functional option that adds export commands to the start
-// of a command
+// of a command. This is a bit of a hacky workaround to maintain exec.Cmd's
+// default environment, while being able to set additional variables
 func SetEnvironment(envMap map[string]string) func(MonitoredCmd) MonitoredCmd {
 	var envSlice []string
 	for k, v := range envMap {
