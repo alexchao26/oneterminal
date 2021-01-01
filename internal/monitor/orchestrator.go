@@ -30,9 +30,9 @@ func NewOrchestrator(commands ...*MonitoredCmd) *Orchestrator {
 // AddCommands will add MonitoredCmds to the commands slice
 // increment pendingCmdCount
 func (orch *Orchestrator) AddCommands(commands ...*MonitoredCmd) {
-	// does not require a mutex/lock because the API is designed
-	// to have all commands added prior to running, i.e. synchronously
+	orch.mut.Lock() // not really necessary
 	orch.commands = append(orch.commands, commands...)
+	orch.mut.Unlock()
 }
 
 // RunCommands will run all of the added commands and block until they have all
