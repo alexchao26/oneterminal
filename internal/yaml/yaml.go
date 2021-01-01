@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -11,10 +12,23 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// yaml is an internal package that will parse a user's
-// yaml files with configs in ~/.config/oneterminal
-// the configs require certain parameters that will
-// panic the application if not found
+var (
+	configDir string
+)
+
+func init() {
+	// initialize configDir, this allows it to be changed for tests
+	if configDir == "" {
+		homedir, err := os.UserHomeDir()
+		if err != nil {
+			panic(fmt.Sprintf("finding home directory %v", err))
+		}
+		configDir = filepath.Join(homedir, ".config/oneterminal")
+		if err := os.MkdirAll(configDir, os.ModePerm); err != nil {
+			panic(fmt.Sprintf("making config dir ~/.config/oneterminal %v", err))
+		}
+	}
+}
 
 // OneTerminalConfig of all the fields from a yaml config
 type OneTerminalConfig struct {
@@ -36,15 +50,8 @@ type Command struct {
 	Environment map[string]string `yaml:"environment,omitempty"`
 }
 
-// ParseAllConfigs will parse each file in ~/.config/oneterminal
-// into a slice.
-// Configs are expected to have
+// ParseAllConfigs parses and returns configs in ~/.config/oneterminal
 func ParseAllConfigs() ([]OneTerminalConfig, error) {
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return nil, err
-	}
-
 	// Unmarshal all values from configDir
 	var allConfigs []OneTerminalConfig
 	files, err := ioutil.ReadDir(configDir)
@@ -57,7 +64,7 @@ func ParseAllConfigs() ([]OneTerminalConfig, error) {
 			continue
 		}
 
-		filename := fmt.Sprintf("%s/%s", configDir, f.Name())
+		filename := path.Join(configDir, f.Name())
 
 		bytes, err := ioutil.ReadFile(filename)
 		if err != nil {
@@ -72,23 +79,6 @@ func ParseAllConfigs() ([]OneTerminalConfig, error) {
 	}
 
 	return allConfigs, nil
-}
-
-// GetConfigDir returns the path to the config directory
-// it should be ~/.config/oneterminal
-// The directory will be made if it does not exist
-func GetConfigDir() (string, error) {
-	homedir, err := os.UserHomeDir()
-	if err != nil {
-		return "", errors.Wrap(err, "finding home directory")
-	}
-
-	oneTermConfigDir := filepath.Join(homedir, ".config/oneterminal")
-
-	if err := os.MkdirAll(oneTermConfigDir, os.ModePerm); err != nil {
-		return "", err
-	}
-	return oneTermConfigDir, nil
 }
 
 // HasNameCollisions ensures there are no duplicate names and doesn't use
@@ -118,14 +108,9 @@ func HasNameCollisions(configs []OneTerminalConfig) bool {
 }
 
 // MakeExampleConfigFromStruct will generate an example config file in the
-// ~/.config/oneterminal directory all required fields
-// it uses the struct
-func MakeExampleConfigFromStruct() error {
-	oneTermConfigDir, err := GetConfigDir()
-	if err != nil {
-		return err
-	}
-
+// ~/.config/oneterminal directory with all required fields.
+// it uses the struct which makes ensure its matches OneTerminalConfig struct
+func MakeExampleConfigFromStruct(filename string) error {
 	exampleConfig := OneTerminalConfig{
 		Name:  "somename",
 		Shell: "zsh",
@@ -162,7 +147,7 @@ Some say you can hear it from space.`,
 	}
 
 	// write to a file
-	err = ioutil.WriteFile(oneTermConfigDir+"/generated-example.yml", bytes, os.ModePerm)
+	err = ioutil.WriteFile(path.Join(configDir, filename), bytes, os.ModePerm)
 	if err != nil {
 		return errors.Wrap(err, "writing to example config file")
 	}
@@ -172,15 +157,17 @@ Some say you can hear it from space.`,
 
 // MakeExampleConfigWithInstructions writes an example oneterminal yaml config
 // to ~/.config/oneterminal/example.yml with helpful comments
-func MakeExampleConfigWithInstructions() error {
-	oneTermConfigDir, err := GetConfigDir()
+func MakeExampleConfigWithInstructions(filename string) error {
+	err := ioutil.WriteFile(path.Join(configDir, filename), exampleConfig, os.ModePerm)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "writing to example config file")
 	}
 
-	err = ioutil.WriteFile(
-		oneTermConfigDir+"/example.yml",
-		[]byte(`# The name of the command. Alphanumeric, dash and hypens are accepted
+	return nil
+}
+
+var exampleConfig = []byte(
+	`# The name of the command. Alphanumeric, dash and hypens are accepted
 name: somename
 
 # shell to use (zsh|bash), defaults to zsh
@@ -219,11 +206,4 @@ commands:
 - name: ""
   command: echo "they silenced me :'("
   silence: true
-`),
-		os.ModePerm)
-	if err != nil {
-		return errors.Wrap(err, "writing to example config file")
-	}
-
-	return nil
-}
+`)

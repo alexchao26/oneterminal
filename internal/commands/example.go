@@ -13,7 +13,7 @@ var ExampleCmd = &cobra.Command{
 	Use:   "example",
 	Short: "Makes a demo oneterminal config in ~/.config/oneterminal",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := yaml.MakeExampleConfigWithInstructions(); err != nil {
+		if err := yaml.MakeExampleConfigWithInstructions("example.yml"); err != nil {
 			panic(fmt.Sprintf("Error generating example config :( %s", err))
 		}
 		fmt.Println("Example file generated at ~/.config/oneterminal/example.yml")
