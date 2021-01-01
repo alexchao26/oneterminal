@@ -11,10 +11,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-// MonitoredCmd is a wrapper around exec.command
-// its implementations calls the shell directly and
-// sending the process a termination/interruption signal
-// and checking if the process has completed
+// MonitoredCmd is a wrapper around exec.Cmd
+//
+// Its implementation calls the shell directly (through zsh/bash)
+//
+// MonitoredCmd can indicate that the underlying process is ready by either
+// matching a regexp or if the underlying process exits.
+// An interrupt signal can be sent to the underlying process via Interrupt().
 type MonitoredCmd struct {
 	command       *exec.Cmd
 	name          string
@@ -25,12 +28,12 @@ type MonitoredCmd struct {
 	dependsOn     []string
 }
 
+type MonitoredCmdOption func(MonitoredCmd) MonitoredCmd
+
 // NewMonitoredCmd makes a command that can be interrupted
-// via its signalChan channel, which is exposed by its
-// Interrupt method
 // Default shell used is zsh, use functional options to change
 // e.g. monitor.NewMonitoredCmd("echo hello", monitor.SetBashShell)
-func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd) *MonitoredCmd {
+func NewMonitoredCmd(command string, options ...MonitoredCmdOption) *MonitoredCmd {
 	c := exec.Command("zsh", "-c", command)
 
 	m := MonitoredCmd{
@@ -48,15 +51,14 @@ func NewMonitoredCmd(command string, options ...func(MonitoredCmd) MonitoredCmd)
 	return &m
 }
 
-// Run will run the underlying command. This function is blocking
-// until the command is done or is interrupted
-// It can be interrupted via the Interrupt receiver method
+// Run the underlying command. This function blocks until the command exits
 func (m *MonitoredCmd) Run() error {
 	// start the command's execution
 	if err := m.command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}
 
+	// blocks until underlying process is done/exits
 	err := m.command.Wait()
 	m.ready = true
 	return err
@@ -126,7 +128,7 @@ func SetBashShell(m MonitoredCmd) MonitoredCmd {
 
 // SetCmdDir is a functional option that adds a Dir property to the underlying
 // command. Dir is the directory to execute the command from
-func SetCmdDir(dir string) func(MonitoredCmd) MonitoredCmd {
+func SetCmdDir(dir string) MonitoredCmdOption {
 	return func(m MonitoredCmd) MonitoredCmd {
 		expandedDir := os.ExpandEnv(dir)
 		if _, err := os.Stat(expandedDir); os.IsNotExist(err) {
@@ -147,7 +149,7 @@ func SetSilenceOutput(m MonitoredCmd) MonitoredCmd {
 
 // SetCmdName is a functional option that sets a monitored command's name,
 // which is used to prefix each line written to Stdout
-func SetCmdName(name string) func(MonitoredCmd) MonitoredCmd {
+func SetCmdName(name string) MonitoredCmdOption {
 	return func(m MonitoredCmd) MonitoredCmd {
 		m.name = name
 		return m
@@ -155,7 +157,7 @@ func SetCmdName(name string) func(MonitoredCmd) MonitoredCmd {
 }
 
 // SetColor is a functional option that sets the ansiColor for the outputs
-func SetColor(terminalColor string) func(MonitoredCmd) MonitoredCmd {
+func SetColor(terminalColor string) MonitoredCmdOption {
 	return func(m MonitoredCmd) MonitoredCmd {
 		m.ansiColor = terminalColor
 		return m
@@ -165,7 +167,7 @@ func SetColor(terminalColor string) func(MonitoredCmd) MonitoredCmd {
 // SetReadyPattern is a functional option that takes in a pattern string
 // that must compile into a valid regexp and sets it to monitored command's
 // readyPattern field
-func SetReadyPattern(pattern string) func(MonitoredCmd) MonitoredCmd {
+func SetReadyPattern(pattern string) MonitoredCmdOption {
 	return func(m MonitoredCmd) MonitoredCmd {
 		m.readyPattern = regexp.MustCompile(pattern)
 		return m
@@ -175,7 +177,7 @@ func SetReadyPattern(pattern string) func(MonitoredCmd) MonitoredCmd {
 // SetDependsOn is a functional option that sets a slice of dependencies
 // for this command. The dependencies are names of commands that need to be done
 // or ready prior to this command starting
-func SetDependsOn(cmdNames []string) func(MonitoredCmd) MonitoredCmd {
+func SetDependsOn(cmdNames []string) MonitoredCmdOption {
 	return func(m MonitoredCmd) MonitoredCmd {
 		m.dependsOn = cmdNames
 		return m
@@ -185,7 +187,7 @@ func SetDependsOn(cmdNames []string) func(MonitoredCmd) MonitoredCmd {
 // SetEnvironment is a functional option that adds export commands to the start
 // of a command. This is a bit of a hacky workaround to maintain exec.Cmd's
 // default environment, while being able to set additional variables
-func SetEnvironment(envMap map[string]string) func(MonitoredCmd) MonitoredCmd {
+func SetEnvironment(envMap map[string]string) MonitoredCmdOption {
 	var envSlice []string
 	for k, v := range envMap {
 		envSlice = append(envSlice, k+"="+v)

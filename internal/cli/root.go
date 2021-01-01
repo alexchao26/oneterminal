@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/alexchao26/oneterminal/internal/commands"
+	"github.com/alexchao26/oneterminal/internal/cli/commands"
 	"github.com/alexchao26/oneterminal/internal/monitor"
 	"github.com/alexchao26/oneterminal/internal/yaml"
 	"github.com/spf13/cobra"
@@ -88,7 +88,7 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 				var colorIndex int
 
 				for _, cmd := range config.Commands {
-					var options []func(monitor.MonitoredCmd) monitor.MonitoredCmd
+					var options []monitor.MonitoredCmdOption
 					if cmd.Name != "" {
 						options = append(options, monitor.SetCmdName(cmd.Name))
 						options = append(options, monitor.SetColor(ansiColors[colorIndex]))

@@ -3,85 +3,91 @@ package yaml
 import (
 	"io/ioutil"
 	"os"
-	"strings"
+	"path"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
-func TestGetConfigDir(t *testing.T) {
-	dir, err := GetConfigDir()
-	if err != nil {
-		t.Errorf("Expected no error, got %s", err)
-	}
-	if !strings.HasSuffix(dir, "/.config/oneterminal") {
-		t.Errorf("Expected directory to end in \"/.config/oneterminal\", path was %s", dir)
-	}
+// helper function that sets the configDir variable to the default temp directory
+func setupTempDir(t *testing.T) {
+	configDir = os.TempDir()
 }
 
 // testing utility function
-func getFileContents(path string) (string, error) {
+func getFileContents(t *testing.T, path string) string {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		return "", errors.Wrapf(err, "error reading file %s", path)
+		t.Fatalf("Reading file: %s; %v", path, err)
 	}
 
-	return string(bytes), nil
+	return string(bytes)
 }
 
 func TestMakeExampleConfigFromStruct(t *testing.T) {
-	if err := MakeExampleConfigFromStruct(); err != nil {
+	setupTempDir(t)
+
+	filename := "oneterminal-example-from-struct.yml"
+	if err := MakeExampleConfigFromStruct(filename); err != nil {
 		t.Errorf("Expected no error from MakeExampleConfigFromStruct, got %s", err)
 	}
 
-	filepath := os.ExpandEnv("$HOME/.config/oneterminal/generated-example.yml")
-	fileContents, err := getFileContents(filepath)
-	if err != nil {
-		t.Errorf("Error reading the generated config file %s", err)
-	}
+	filepath := path.Join(configDir, filename)
+	t.Logf("Wrote to temp file %s\n", filepath)
+
+	fileContents := getFileContents(t, filepath)
 	if len(fileContents) < 50 {
 		t.Errorf("Expected file to be at least 50 characters, got %d", len(fileContents))
 	}
 
-	// remove example file
+	// remove example file when done
 	os.Remove(filepath)
 }
 
 func TestMakeExampleConfigWithInstructions(t *testing.T) {
-	err := MakeExampleConfigWithInstructions()
+	setupTempDir(t)
+
+	filename := "oneterminal-example-with-instructions.yml"
+	err := MakeExampleConfigWithInstructions(filename)
 	if err != nil {
 		t.Errorf("Did not expect error, got error %s", err)
 	}
 
-	filepath := os.ExpandEnv("$HOME/.config/oneterminal/example.yml")
-	fileContents, err := getFileContents(filepath)
-	if err != nil {
-		t.Errorf("Error reading the generated config file %s", err)
-	}
+	filepath := path.Join(configDir, filename)
+	t.Logf("Wrote to temp file %s\n", filepath)
+
+	fileContents := getFileContents(t, filepath)
+
 	if len(fileContents) < 50 {
 		t.Errorf("Expected file to be at least 50 characters, got %d", len(fileContents))
 	}
+	// TODO could setup a golden file to compare to
 
-	// remove example file
+	// remove example file when done
 	os.Remove(filepath)
 }
 
-func TestParseConfigs1(t *testing.T) {
-	// add at least one config
-	MakeExampleConfigFromStruct()
+func TestParseAllConfigs(t *testing.T) {
+	setupTempDir(t)
+
+	// add an example config
+	filename := "oneterminal-example-parse-configs.yml"
+	MakeExampleConfigFromStruct(filename)
+	t.Logf("Wrote to temp file %s\n", path.Join(configDir, filename))
+
 	configs, err := ParseAllConfigs()
 	if err != nil {
+		t.Log("Relies on MakeExampleConfigFromStruct, ensure it is working.")
 		t.Errorf("Did not expect error, got %s", err)
 	}
 	if len(configs) < 1 {
+		t.Log("Relies on MakeExampleConfigFromStruct, ensure it is working.")
 		t.Errorf("Expected at least one config, got %d", len(configs))
 	}
 
 	for _, config := range configs {
-		// find the generated command
+		// only check the generated example command
 		if config.Name == "somename" {
 			if config.Shell != "zsh" {
-				t.Errorf("Expected shell to be set to \"zsh\", got %q", config.Shell)
+				t.Errorf(`Expected shell to be set to "zsh", got %q"`, config.Shell)
 			}
 			if config.Short == "" {
 				t.Errorf("Expected config's Short to not be an empty string, got %q", config.Short)
@@ -99,6 +105,5 @@ func TestParseConfigs1(t *testing.T) {
 	}
 
 	// delete that file when done
-	filepath := os.ExpandEnv("$HOME/.config/oneterminal/generated-example.yml")
-	os.Remove(filepath)
+	os.Remove(path.Join(configDir, filename))
 }

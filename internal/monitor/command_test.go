@@ -1,6 +1,45 @@
 package monitor
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestMonitoredCmd_Run(t *testing.T) {
+	for name, tc := range map[string]struct {
+		command             string
+		commandOpts         []MonitoredCmdOption
+		wantOutputToContain []string
+	}{
+		"echo Hello World": {"echo Hello, world!", nil, []string{"Hello, world!"}},
+		"go version":       {"go version", nil, []string{"go version"}},
+		"SetEnvironment Option": {
+			"echo $TEST_ENV_VAR",
+			[]MonitoredCmdOption{
+				SetEnvironment(map[string]string{
+					"TEST_ENV_VAR": "beepboop",
+				}),
+			}, []string{"beepboop"}},
+	} {
+		closure := tc
+		t.Run(name, func(tt *testing.T) {
+			cmd := NewMonitoredCmd(closure.command, closure.commandOpts...)
+
+			var sb strings.Builder // implements io.Writer
+			cmd.command.Stdout = &sb
+			cmd.command.Stderr = &sb
+			cmd.Run()
+
+			outputs := sb.String()
+
+			for _, wantPiece := range closure.wantOutputToContain {
+				if !strings.Contains(outputs, wantPiece) {
+					tt.Errorf("cmd.Run() = %s, want it to contain %s", outputs, wantPiece)
+				}
+			}
+		})
+	}
+}
 
 var prefixEachLineTests = []struct {
 	input, prefix, want string
