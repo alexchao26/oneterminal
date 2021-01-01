@@ -88,7 +88,7 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 				var colorIndex int
 
 				for _, cmd := range config.Commands {
-					var options []func(monitor.MonitoredCmd) monitor.MonitoredCmd
+					var options []monitor.MonitoredCmdOption
 					if cmd.Name != "" {
 						options = append(options, monitor.SetCmdName(cmd.Name))
 						options = append(options, monitor.SetColor(ansiColors[colorIndex]))
