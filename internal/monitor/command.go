@@ -67,7 +67,12 @@ func (m *MonitoredCmd) Run() error {
 // Interrupt will send an interrupt signal to the process
 func (m *MonitoredCmd) Interrupt() {
 	if m.command.Process != nil {
-		m.command.Process.Signal(syscall.SIGINT)
+		// Note: if the underlying process does not handle interrupt signals,
+		// it will just keep running
+		err := m.command.Process.Signal(syscall.SIGINT)
+		if err != nil {
+			fmt.Printf("Error sending interrupt to %s: %v\n", m.name, err)
+		}
 	}
 }
 
