@@ -50,6 +50,7 @@ func (orch *Orchestrator) RunCommands() {
 		orch.mut.Unlock()
 		orch.SendInterrupts()
 	}()
+	defer close(signalChan)
 
 	namesToCmds := make(map[string]*MonitoredCmd)
 	for _, cmd := range orch.commands {
@@ -77,18 +78,14 @@ func (orch *Orchestrator) RunCommands() {
 
 				canStart, err := checkDependencies(cmd, namesToCmds)
 				if err != nil {
-					fmt.Println(err)
-					close(signalChan)
+					fmt.Printf("%s: %v\n", cmd.name, err)
 					return
 				}
 				if canStart {
-					ticker.Stop() // safe to call twice?
+					ticker.Stop()
 					err := cmd.Run()
 					if err != nil {
-						// TODO close the signalChan to send interrupts to other processes b/c a failed dependency should interrupt all other dependencies
-						// TODO add error messaging here if the err is from something other than an interrupt signal
-						// fmt.Printf("Error running %s: %v\n", cmd.name, err)
-						fmt.Println(err)
+						fmt.Printf("%s: %v\n", cmd.name, err)
 					}
 					break
 				}
