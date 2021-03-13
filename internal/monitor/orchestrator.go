@@ -40,7 +40,7 @@ func (orch *Orchestrator) AddCommands(commands ...*MonitoredCmd) {
 // finished running. This can occur from the processes ending naturally
 // or being interrupted
 func (orch *Orchestrator) RunCommands() {
-	signalChan := make(chan os.Signal, 1)
+	signalChan := make(chan os.Signal)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
 
 	go func() {
@@ -89,7 +89,6 @@ func (orch *Orchestrator) RunCommands() {
 						// TODO add error messaging here if the err is from something other than an interrupt signal
 						// fmt.Printf("Error running %s: %v\n", cmd.name, err)
 						fmt.Println(err)
-						close(signalChan)
 					}
 					break
 				}
