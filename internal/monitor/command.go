@@ -64,6 +64,8 @@ func (m *MonitoredCmd) Run() error {
 	return err
 }
 
+// TODO add RunContext method for another synchronization option
+
 // Interrupt will send an interrupt signal to the process
 func (m *MonitoredCmd) Interrupt() {
 	if m.command.Process != nil {

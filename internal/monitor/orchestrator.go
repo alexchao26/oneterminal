@@ -62,6 +62,7 @@ func (orch *Orchestrator) RunCommands() {
 		go func() {
 			defer orch.wg.Done()
 			ticker := time.NewTicker(time.Millisecond * 200)
+			defer ticker.Stop()
 			// on every tick. check if entire orchestrator has been interrupted
 			// then check dependencies of of this command, run it if unblocked
 			for {
@@ -81,13 +82,14 @@ func (orch *Orchestrator) RunCommands() {
 					return
 				}
 				if canStart {
+					ticker.Stop() // safe to call twice?
 					err := cmd.Run()
-					// fmt.Println("ERROR FROM cmd.Run", err.Error())
 					if err != nil {
 						// TODO close the signalChan to send interrupts to other processes b/c a failed dependency should interrupt all other dependencies
 						// TODO add error messaging here if the err is from something other than an interrupt signal
 						// fmt.Printf("Error running %s: %v\n", cmd.name, err)
-						// close(signalChan)
+						fmt.Println(err)
+						close(signalChan)
 					}
 					break
 				}
