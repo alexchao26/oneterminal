@@ -35,52 +35,52 @@ type CmdOption func(Cmd) Cmd
 // Default shell used is zsh, use functional options to change
 // e.g. monitor.NewCmd("echo hello", monitor.SetBashShell)
 func NewCmd(command string, options ...CmdOption) *Cmd {
-	c := exec.Command("zsh", "-c", command)
+	execCmd := exec.Command("zsh", "-c", command)
 
-	m := Cmd{
-		command: c,
+	c := Cmd{
+		command: execCmd,
 	}
 
 	// apply functional options
 	for _, f := range options {
-		m = f(m)
+		c = f(c)
 	}
 
-	c.Stdout = &m
-	c.Stderr = &m
+	execCmd.Stdout = &c
+	execCmd.Stderr = &c
 
-	return &m
+	return &c
 }
 
 // Run the underlying command. This function blocks until the command exits
-func (m *Cmd) Run() error {
+func (c *Cmd) Run() error {
 	// start the command's execution
-	if err := m.command.Start(); err != nil {
+	if err := c.command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}
 
 	// blocks until underlying process is done/exits
-	err := m.command.Wait()
-	m.ready = true
+	err := c.command.Wait()
+	c.ready = true
 	return err
 }
 
 // TODO add RunContext method for another synchronization option
 
 // Interrupt will send an interrupt signal to the process
-func (m *Cmd) Interrupt() error {
+func (c *Cmd) Interrupt() error {
 	// Process has not started yet
-	if m.command.Process == nil || m.command.ProcessState == nil {
+	if c.command.Process == nil || c.command.ProcessState == nil {
 		return nil
 	}
-	if m.command.ProcessState.Exited() {
+	if c.command.ProcessState.Exited() {
 		return nil
 	}
 	// Note: if the underlying process does not handle interrupt signals,
 	// it will probably just keep running
-	err := m.command.Process.Signal(os.Interrupt)
+	err := c.command.Process.Signal(os.Interrupt)
 	if err != nil {
-		return errors.Wrapf(err, "Error sending interrupt to %s", m.name)
+		return errors.Wrapf(err, "Error sending interrupt to %s", c.name)
 	}
 	return nil
 }
@@ -90,22 +90,22 @@ func (m *Cmd) Interrupt() error {
 // Write "intercepts" writes to Stdout/Stderr to check if the outputs match a
 // regexp and determines if a command has reached its "ready state"
 // the ready state is used by Orchestrator to coordinate dependent commands
-func (m *Cmd) Write(in []byte) (int, error) {
-	if m.readyPattern != nil && m.readyPattern.Match(in) {
-		m.ready = true
+func (c *Cmd) Write(in []byte) (int, error) {
+	if c.readyPattern != nil && c.readyPattern.Match(in) {
+		c.ready = true
 	}
 
-	if m.silenceOutput {
+	if c.silenceOutput {
 		return len(in), nil
 	}
 
 	// if no name is set, just write straight to stdout
 	var err error
-	if m.name == "" {
+	if c.name == "" {
 		_, err = os.Stdout.Write(in)
 	} else {
 		// if command's name is set, print with prefixed outputs
-		prefixed := prefixEveryline(string(in), fmt.Sprintf("%s%s%s", m.ansiColor, m.name, "\033[0m"))
+		prefixed := prefixEveryline(string(in), fmt.Sprintf("%s%s%s", c.ansiColor, c.name, "\033[0m"))
 		_, err = os.Stdout.Write([]byte(prefixed))
 	}
 
@@ -124,26 +124,26 @@ func prefixEveryline(in, prefix string) (out string) {
 }
 
 // IsReady is a simple getter for the ready state of a monitored command
-func (m *Cmd) IsReady() bool {
-	return m.ready
+func (c *Cmd) IsReady() bool {
+	return c.ready
 }
 
 // SetBashShell is a functional option to change the executing shell to zsh
-func SetBashShell(m Cmd) Cmd {
-	m.command.Args[0] = "bash"
+func SetBashShell(c Cmd) Cmd {
+	c.command.Args[0] = "bash"
 	resolvedPath, err := exec.LookPath("bash")
 	if err != nil {
 		panic(fmt.Sprintf("Error setting bash as shell %s", err))
 	}
 
-	m.command.Path = resolvedPath
-	return m
+	c.command.Path = resolvedPath
+	return c
 }
 
 // SetCmdDir is a functional option that adds a Dir property to the underlying
 // command. Dir is the directory to execute the command from
 func SetCmdDir(dir string) CmdOption {
-	return func(m Cmd) Cmd {
+	return func(c Cmd) Cmd {
 		if dir[0] == '~' {
 			dir = fmt.Sprintf("$HOME%s", dir[1:])
 		}
@@ -154,32 +154,32 @@ func SetCmdDir(dir string) CmdOption {
 			panic(fmt.Sprintf("Directory %q does not exist: %s", dir, err))
 		}
 
-		m.command.Dir = expandedDir
-		return m
+		c.command.Dir = expandedDir
+		return c
 	}
 }
 
 // SetSilenceOutput sets the command's Stdout and Stderr to nil so no output
 // will be seen in the terminal
-func SetSilenceOutput(m Cmd) Cmd {
-	m.silenceOutput = true
-	return m
+func SetSilenceOutput(c Cmd) Cmd {
+	c.silenceOutput = true
+	return c
 }
 
 // SetCmdName is a functional option that sets a monitored command's name,
 // which is used to prefix each line written to Stdout
 func SetCmdName(name string) CmdOption {
-	return func(m Cmd) Cmd {
-		m.name = name
-		return m
+	return func(c Cmd) Cmd {
+		c.name = name
+		return c
 	}
 }
 
 // SetColor is a functional option that sets the ansiColor for the outputs
 func SetColor(terminalColor string) CmdOption {
-	return func(m Cmd) Cmd {
-		m.ansiColor = terminalColor
-		return m
+	return func(c Cmd) Cmd {
+		c.ansiColor = terminalColor
+		return c
 	}
 }
 
@@ -187,9 +187,9 @@ func SetColor(terminalColor string) CmdOption {
 // that must compile into a valid regexp and sets it to monitored command's
 // readyPattern field
 func SetReadyPattern(pattern string) CmdOption {
-	return func(m Cmd) Cmd {
-		m.readyPattern = regexp.MustCompile(pattern)
-		return m
+	return func(c Cmd) Cmd {
+		c.readyPattern = regexp.MustCompile(pattern)
+		return c
 	}
 }
 
@@ -197,9 +197,9 @@ func SetReadyPattern(pattern string) CmdOption {
 // for this command. The dependencies are names of commands that need to be done
 // or ready prior to this command starting
 func SetDependsOn(cmdNames []string) CmdOption {
-	return func(m Cmd) Cmd {
-		m.dependsOn = cmdNames
-		return m
+	return func(c Cmd) Cmd {
+		c.dependsOn = cmdNames
+		return c
 	}
 }
 
@@ -213,8 +213,8 @@ func SetEnvironment(envMap map[string]string) CmdOption {
 	}
 
 	exportString := "export " + strings.Join(envSlice, " && export ") + " && "
-	return func(m Cmd) Cmd {
-		m.command.Args[2] = exportString + m.command.Args[2]
-		return m
+	return func(c Cmd) Cmd {
+		c.command.Args[2] = exportString + c.command.Args[2]
+		return c
 	}
 }

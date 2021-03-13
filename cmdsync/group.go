@@ -121,14 +121,14 @@ func (g *Group) SendInterrupts() {
 	}
 }
 
-func checkDependencies(m *Cmd, allCmdsMap map[string]*Cmd) (bool, error) {
-	for _, depName := range m.dependsOn {
+func checkDependencies(cmd *Cmd, allCmdsMap map[string]*Cmd) (bool, error) {
+	for _, depName := range cmd.dependsOn {
 		depCmd, ok := allCmdsMap[depName]
 		if !ok {
-			return false, errors.Errorf("%q depends-on %q, but %q does not exist", m.name, depName, depName)
+			return false, errors.Errorf("%q depends-on %q, but %q does not exist", cmd.name, depName, depName)
 		}
-		if m.name == depName {
-			return false, errors.Errorf("%s depends on itself", m.name)
+		if cmd.name == depName {
+			return false, errors.Errorf("%s depends on itself", cmd.name)
 		}
 		if !depCmd.IsReady() {
 			return false, nil
