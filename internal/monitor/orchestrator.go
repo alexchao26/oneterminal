@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -36,10 +37,10 @@ func (orch *Orchestrator) AddCommands(commands ...*MonitoredCmd) {
 }
 
 // RunCommands will run all of the added commands and block until they have all
-// finished running. The can occur from the processes ending naturally
+// finished running. This can occur from the processes ending naturally
 // or being interrupted
 func (orch *Orchestrator) RunCommands() {
-	signalChan := make(chan os.Signal, 1)
+	signalChan := make(chan os.Signal)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
 
 	go func() {
@@ -56,9 +57,12 @@ func (orch *Orchestrator) RunCommands() {
 	}
 
 	for _, cmd := range orch.commands {
+		cmd := cmd
 		orch.wg.Add(1)
-		go func(cmd *MonitoredCmd) {
-			ticker := time.NewTicker(time.Millisecond * 100)
+		go func() {
+			defer orch.wg.Done()
+			ticker := time.NewTicker(time.Millisecond * 200)
+			defer ticker.Stop()
 			// on every tick. check if entire orchestrator has been interrupted
 			// then check dependencies of of this command, run it if unblocked
 			for {
@@ -71,16 +75,25 @@ func (orch *Orchestrator) RunCommands() {
 				}
 				orch.mut.RUnlock()
 
-				if checkDependencies(cmd, namesToCmds) {
+				canStart, err := checkDependencies(cmd, namesToCmds)
+				if err != nil {
+					fmt.Println(err)
+					close(signalChan)
+					return
+				}
+				if canStart {
+					ticker.Stop() // safe to call twice?
 					err := cmd.Run()
 					if err != nil {
+						// TODO close the signalChan to send interrupts to other processes b/c a failed dependency should interrupt all other dependencies
+						// TODO add error messaging here if the err is from something other than an interrupt signal
+						// fmt.Printf("Error running %s: %v\n", cmd.name, err)
 						fmt.Println(err)
 					}
 					break
 				}
 			}
-			orch.wg.Done()
-		}(cmd)
+		}()
 	}
 
 	orch.wg.Wait()
@@ -93,11 +106,15 @@ func (orch *Orchestrator) SendInterrupts() {
 	}
 }
 
-func checkDependencies(m *MonitoredCmd, allCmdsMap map[string]*MonitoredCmd) bool {
-	for _, dep := range m.dependsOn {
-		if !allCmdsMap[dep].IsReady() {
-			return false
+func checkDependencies(m *MonitoredCmd, allCmdsMap map[string]*MonitoredCmd) (bool, error) {
+	for _, depName := range m.dependsOn {
+		depCmd, ok := allCmdsMap[depName]
+		if !ok {
+			return false, errors.New(fmt.Sprintf("%q depends-on %q, but %q does not exist", m.name, depName, depName))
+		}
+		if !depCmd.IsReady() {
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }

@@ -19,7 +19,7 @@ It strives to reduce the number of terminal windows
 that need to be open.
 
 Config files live in ~/.config/oneterminal
-Run oneterminal example to generate an example config file`,
+Run "oneterminal example" to generate an example config file`,
 }
 
 // Execute the root command
