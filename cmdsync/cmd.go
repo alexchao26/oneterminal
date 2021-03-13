@@ -29,27 +29,30 @@ type Cmd struct {
 	dependsOn     []string
 }
 
-type CmdOption func(Cmd) Cmd
+type CmdOption func(*Cmd) error
 
 // NewCmd makes a command that can be interrupted
 // Default shell used is zsh, use functional options to change
 // e.g. monitor.NewCmd("echo hello", monitor.SetBashShell)
-func NewCmd(command string, options ...CmdOption) *Cmd {
+func NewCmd(command string, options ...CmdOption) (*Cmd, error) {
 	execCmd := exec.Command("zsh", "-c", command)
 
-	c := Cmd{
+	c := &Cmd{
 		command: execCmd,
 	}
 
 	// apply functional options
-	for _, f := range options {
-		c = f(c)
+	for _, opt := range options {
+		err := opt(c)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	execCmd.Stdout = &c
-	execCmd.Stderr = &c
+	execCmd.Stdout = c
+	execCmd.Stderr = c
 
-	return &c
+	return c, nil
 }
 
 // Run the underlying command. This function blocks until the command exits
@@ -128,22 +131,34 @@ func (c *Cmd) IsReady() bool {
 	return c.ready
 }
 
-// SetBashShell is a functional option to change the executing shell to zsh
-func SetBashShell(c Cmd) Cmd {
-	c.command.Args[0] = "bash"
-	resolvedPath, err := exec.LookPath("bash")
-	if err != nil {
-		panic(fmt.Sprintf("Error setting bash as shell %s", err))
-	}
+// Shell is a functional option to change the executing shell to zsh
+func Shell(shell string) CmdOption {
+	return func(c *Cmd) error {
+		allowedShells := map[string]bool{
+			"zsh":  true,
+			"bash": true,
+			"sh":   true,
+		}
+		if !allowedShells[shell] {
+			return errors.Errorf("%q shell not supported. Use zsh|bash|sh", shell)
+		}
 
-	c.command.Path = resolvedPath
-	return c
+		c.command.Args[0] = shell
+		resolvedPath, err := exec.LookPath(shell)
+		if err != nil {
+			return errors.Errorf("Error resolving %q shell: %v", shell, err)
+		}
+
+		c.command.Path = resolvedPath
+		return nil
+	}
 }
 
-// SetCmdDir is a functional option that adds a Dir property to the underlying
-// command. Dir is the directory to execute the command from
-func SetCmdDir(dir string) CmdOption {
-	return func(c Cmd) Cmd {
+// CmdDir is a functional option that modifies the Dir property of the
+// underlying exec.Cmd which is the directory to execute the Command from
+func CmdDir(dir string) CmdOption {
+	return func(c *Cmd) error {
+		// expand '~' to $HOME for os.ExpandEnv to pickup
 		if dir[0] == '~' {
 			dir = fmt.Sprintf("$HOME%s", dir[1:])
 		}
@@ -151,70 +166,80 @@ func SetCmdDir(dir string) CmdOption {
 
 		_, err := os.Stat(expandedDir)
 		if os.IsNotExist(err) {
-			panic(fmt.Sprintf("Directory %q does not exist: %s", dir, err))
+			return errors.Errorf("Directory %q does not exist: %s", dir, err)
 		}
 
 		c.command.Dir = expandedDir
-		return c
+		return nil
 	}
 }
 
-// SetSilenceOutput sets the command's Stdout and Stderr to nil so no output
+// SilenceOutput sets the command's Stdout and Stderr to nil so no output
 // will be seen in the terminal
-func SetSilenceOutput(c Cmd) Cmd {
-	c.silenceOutput = true
-	return c
+func SilenceOutput() CmdOption {
+	return func(c *Cmd) error {
+		c.silenceOutput = true
+		return nil
+	}
 }
 
-// SetCmdName is a functional option that sets a monitored command's name,
+// CmdName is a functional option that sets a monitored command's name,
 // which is used to prefix each line written to Stdout
-func SetCmdName(name string) CmdOption {
-	return func(c Cmd) Cmd {
+func CmdName(name string) CmdOption {
+	return func(c *Cmd) error {
 		c.name = name
-		return c
+		return nil
 	}
 }
 
 // SetColor is a functional option that sets the ansiColor for the outputs
 func SetColor(terminalColor string) CmdOption {
-	return func(c Cmd) Cmd {
+	return func(c *Cmd) error {
 		c.ansiColor = terminalColor
-		return c
+		return nil
 	}
 }
 
-// SetReadyPattern is a functional option that takes in a pattern string
+// ReadyPattern is a functional option that takes in a pattern string
 // that must compile into a valid regexp and sets it to monitored command's
 // readyPattern field
-func SetReadyPattern(pattern string) CmdOption {
-	return func(c Cmd) Cmd {
-		c.readyPattern = regexp.MustCompile(pattern)
-		return c
+func ReadyPattern(pattern string) CmdOption {
+	return func(c *Cmd) error {
+		r, err := regexp.Compile(pattern)
+		if err != nil {
+			return errors.Wrapf(err, "compiling regexp %q", pattern)
+		}
+		c.readyPattern = r
+		return nil
 	}
 }
 
-// SetDependsOn is a functional option that sets a slice of dependencies
-// for this command. The dependencies are names of commands that need to be done
-// or ready prior to this command starting
-func SetDependsOn(cmdNames []string) CmdOption {
-	return func(c Cmd) Cmd {
+// DependsOn is a functional option that sets a slice of dependencies for this
+// command. The dependencies are names of commands that need to have completed
+// or reached a ready state prior to this command starting.
+//
+// Note that there is no validation that the cmdNames are valid/match other
+// Cmd's configs (because it would cause a circular dependency). Some, but not
+// all possible config errors are checked at runtime.
+func DependsOn(cmdNames []string) CmdOption {
+	return func(c *Cmd) error {
 		c.dependsOn = cmdNames
-		return c
+		return nil
 	}
 }
 
-// SetEnvironment is a functional option that adds export commands to the start
+// Environment is a functional option that adds export commands to the start
 // of a command. This is a bit of a hacky workaround to maintain exec.Cmd's
 // default environment, while being able to set additional variables
-func SetEnvironment(envMap map[string]string) CmdOption {
+func Environment(envMap map[string]string) CmdOption {
 	var envSlice []string
 	for k, v := range envMap {
 		envSlice = append(envSlice, k+"="+v)
 	}
 
 	exportString := "export " + strings.Join(envSlice, " && export ") + " && "
-	return func(c Cmd) Cmd {
+	return func(c *Cmd) error {
 		c.command.Args[2] = exportString + c.command.Args[2]
-		return c
+		return nil
 	}
 }

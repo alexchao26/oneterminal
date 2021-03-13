@@ -16,14 +16,17 @@ func TestMonitoredCmd_Run(t *testing.T) {
 		"SetEnvironment Option": {
 			"echo $TEST_ENV_VAR",
 			[]CmdOption{
-				SetEnvironment(map[string]string{
+				Environment(map[string]string{
 					"TEST_ENV_VAR": "beepboop",
 				}),
 			}, []string{"beepboop"}},
 	} {
 		closure := tc
 		t.Run(name, func(tt *testing.T) {
-			cmd := NewCmd(closure.command, closure.commandOpts...)
+			cmd, err := NewCmd(closure.command, closure.commandOpts...)
+			if err != nil {
+				t.Errorf("NewCmd() error want nil, got %v", err)
+			}
 
 			var sb strings.Builder // implements io.Writer
 			cmd.command.Stdout = &sb

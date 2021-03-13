@@ -91,37 +91,40 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 				for _, cmd := range config.Commands {
 					var options []cmdsync.CmdOption
 					if cmd.Name != "" {
-						options = append(options, cmdsync.SetCmdName(cmd.Name))
+						options = append(options, cmdsync.CmdName(cmd.Name))
 						options = append(options, cmdsync.SetColor(ansiColors[colorIndex]))
 						colorIndex++
 					}
-					if config.Shell == "bash" {
-						options = append(options, cmdsync.SetBashShell)
+					if config.Shell != "" {
+						options = append(options, cmdsync.Shell(config.Shell))
 					}
 					if cmd.CmdDir != "" {
-						options = append(options, cmdsync.SetCmdDir(cmd.CmdDir))
+						options = append(options, cmdsync.CmdDir(cmd.CmdDir))
 					}
 					if cmd.Silence {
-						options = append(options, cmdsync.SetSilenceOutput)
+						options = append(options, cmdsync.SilenceOutput())
 					}
 					if cmd.ReadyRegexp != "" {
-						options = append(options, cmdsync.SetReadyPattern(cmd.ReadyRegexp))
+						options = append(options, cmdsync.ReadyPattern(cmd.ReadyRegexp))
 					}
 					if len(cmd.DependsOn) != 0 {
-						options = append(options, cmdsync.SetDependsOn(cmd.DependsOn))
+						options = append(options, cmdsync.DependsOn(cmd.DependsOn))
 					}
 					if cmd.Environment != nil {
-						options = append(options, cmdsync.SetEnvironment(cmd.Environment))
+						options = append(options, cmdsync.Environment(cmd.Environment))
 					}
 
-					c := cmdsync.NewCmd(cmd.Command, options...)
+					c, err := cmdsync.NewCmd(cmd.Command, options...)
+					if err != nil {
+						panic(fmt.Sprintf("error making command %q: %v", cmd.Name, err))
+					}
 
 					group.AddCommands(c)
 				}
 
 				err := group.Run(context.Background())
 				if err != nil {
-					fmt.Printf("running %s: %v\n", config.Name, err)
+					fmt.Printf("running %q: %v\n", config.Name, err)
 				}
 			},
 		}
