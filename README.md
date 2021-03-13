@@ -110,24 +110,16 @@ Run `oneterminal help` to see this command show up under available commands. Not
 
 # oneterminal Commands
 
-`oneterminal example`: Makes a demo oneterminal config in ~/.config/oneterminal
-
-`oneterminal completion --help`: Get helper text to setup shell completion for zsh or bash shells
-
-`oneterminal version`: Print the version number of oneterminal
-
-`oneterminal help`: Help about any command
-
-`oneterminal <your-configured-commands>`
+Command                                  | Description
+-----------------------------------------|--------------------------------------
+`oneterminal example`                    | Makes a demo oneterminal config in ~/.config/oneterminal
+`oneterminal completion --help`          | Get helper text to setup shell completion for zsh or bash shells
+`oneterminal version`                    | Print the version number of oneterminal
+`oneterminal help`                       | Help about any command
+`oneterminal <your-configured-commands>` | Your commands configured via ~/.config/oneterminal/*.yml
 
 # Contributing to oneterminal
 
 This project is still in its infancy and its future path is undetermined.
 
 I welcome contributions but ask that you open an issue to discuss bugs and desired features!
-
-# Dependencies
-
-- github.com/pkg/errors v0.8.1
-- github.com/spf13/cobra v1.1.1
-- gopkg.in/yaml.v2 v2.3.0

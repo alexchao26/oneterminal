@@ -8,14 +8,14 @@ import (
 func TestMonitoredCmd_Run(t *testing.T) {
 	for name, tc := range map[string]struct {
 		command             string
-		commandOpts         []MonitoredCmdOption
+		commandOpts         []CmdOption
 		wantOutputToContain []string
 	}{
 		"echo Hello World": {"echo Hello, world!", nil, []string{"Hello, world!"}},
 		"go version":       {"go version", nil, []string{"go version"}},
 		"SetEnvironment Option": {
 			"echo $TEST_ENV_VAR",
-			[]MonitoredCmdOption{
+			[]CmdOption{
 				SetEnvironment(map[string]string{
 					"TEST_ENV_VAR": "beepboop",
 				}),
@@ -23,7 +23,7 @@ func TestMonitoredCmd_Run(t *testing.T) {
 	} {
 		closure := tc
 		t.Run(name, func(tt *testing.T) {
-			cmd := NewMonitoredCmd(closure.command, closure.commandOpts...)
+			cmd := NewCmd(closure.command, closure.commandOpts...)
 
 			var sb strings.Builder // implements io.Writer
 			cmd.command.Stdout = &sb

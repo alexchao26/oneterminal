@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -11,6 +12,7 @@ import (
 )
 
 // rootCmd represents the base command when called without any subcommands
+// subcommands are added in cli.init()
 var rootCmd = &cobra.Command{
 	Use:   "oneterminal",
 	Short: "oneterminal replaces your multi-tab terminal window setup",
@@ -30,10 +32,10 @@ func Execute() {
 	}
 }
 
-// On initialization, parse all yaml file configs from ~/.config/oneterminal
-// directory and add them to the root command.
+// Parse all yaml file configs from the ~/.config/oneterminal directory and add
+// them to the root command.
+//
 // All commands will be accessible via oneterminal <command-name>
-// where command-name comes from each yaml file.
 func init() {
 	allConfigs, err := yaml.ParseAllConfigs()
 	if err != nil {
@@ -84,11 +86,11 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 			Long:  config.Long,
 			Run: func(cmd *cobra.Command, args []string) {
 				// Setup Orchestrator and its commands
-				Orchestrator := monitor.NewOrchestrator()
+				group := monitor.NewGroup()
 				var colorIndex int
 
 				for _, cmd := range config.Commands {
-					var options []monitor.MonitoredCmdOption
+					var options []monitor.CmdOption
 					if cmd.Name != "" {
 						options = append(options, monitor.SetCmdName(cmd.Name))
 						options = append(options, monitor.SetColor(ansiColors[colorIndex]))
@@ -113,12 +115,15 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 						options = append(options, monitor.SetEnvironment(cmd.Environment))
 					}
 
-					monitoredCmd := monitor.NewMonitoredCmd(cmd.Command, options...)
+					c := monitor.NewCmd(cmd.Command, options...)
 
-					Orchestrator.AddCommands(monitoredCmd)
+					group.AddCommands(c)
 				}
 
-				Orchestrator.RunCommands()
+				err := group.Run(context.Background())
+				if err != nil {
+					fmt.Printf("running %s: %v\n", config.Name, err)
+				}
 			},
 		}
 

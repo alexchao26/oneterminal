@@ -10,14 +10,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-// MonitoredCmd is a wrapper around exec.Cmd
+// Cmd is a wrapper around exec.Cmd
 //
 // Its implementation calls the shell directly (through zsh/bash)
 //
-// MonitoredCmd can indicate that the underlying process is ready by either
+// Cmd can indicate that the underlying process is ready by either
 // matching a regexp or if the underlying process exits.
 // An interrupt signal can be sent to the underlying process via Interrupt().
-type MonitoredCmd struct {
+type Cmd struct {
 	command       *exec.Cmd
 	name          string
 	ansiColor     string
@@ -27,15 +27,15 @@ type MonitoredCmd struct {
 	dependsOn     []string
 }
 
-type MonitoredCmdOption func(MonitoredCmd) MonitoredCmd
+type CmdOption func(Cmd) Cmd
 
-// NewMonitoredCmd makes a command that can be interrupted
+// NewCmd makes a command that can be interrupted
 // Default shell used is zsh, use functional options to change
-// e.g. monitor.NewMonitoredCmd("echo hello", monitor.SetBashShell)
-func NewMonitoredCmd(command string, options ...MonitoredCmdOption) *MonitoredCmd {
+// e.g. monitor.NewCmd("echo hello", monitor.SetBashShell)
+func NewCmd(command string, options ...CmdOption) *Cmd {
 	c := exec.Command("zsh", "-c", command)
 
-	m := MonitoredCmd{
+	m := Cmd{
 		command: c,
 	}
 
@@ -51,7 +51,7 @@ func NewMonitoredCmd(command string, options ...MonitoredCmdOption) *MonitoredCm
 }
 
 // Run the underlying command. This function blocks until the command exits
-func (m *MonitoredCmd) Run() error {
+func (m *Cmd) Run() error {
 	// start the command's execution
 	if err := m.command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
@@ -66,7 +66,7 @@ func (m *MonitoredCmd) Run() error {
 // TODO add RunContext method for another synchronization option
 
 // Interrupt will send an interrupt signal to the process
-func (m *MonitoredCmd) Interrupt() {
+func (m *Cmd) Interrupt() {
 	// Process has not started yet
 	if m.command.Process == nil || m.command.ProcessState == nil {
 		return
@@ -82,12 +82,12 @@ func (m *MonitoredCmd) Interrupt() {
 	}
 }
 
-// Write implements io.Writer, so that MonitoredCmd itself can be used for
+// Write implements io.Writer, so that Cmd itself can be used for
 // exec.Cmd.Stdout and Stderr
 // Write "intercepts" writes to Stdout/Stderr to check if the outputs match a
 // regexp and determines if a command has reached its "ready state"
 // the ready state is used by Orchestrator to coordinate dependent commands
-func (m *MonitoredCmd) Write(in []byte) (int, error) {
+func (m *Cmd) Write(in []byte) (int, error) {
 	if m.readyPattern != nil && m.readyPattern.Match(in) {
 		m.ready = true
 	}
@@ -121,12 +121,12 @@ func prefixEveryline(in, prefix string) (out string) {
 }
 
 // IsReady is a simple getter for the ready state of a monitored command
-func (m *MonitoredCmd) IsReady() bool {
+func (m *Cmd) IsReady() bool {
 	return m.ready
 }
 
 // SetBashShell is a functional option to change the executing shell to zsh
-func SetBashShell(m MonitoredCmd) MonitoredCmd {
+func SetBashShell(m Cmd) Cmd {
 	m.command.Args[0] = "bash"
 	resolvedPath, err := exec.LookPath("bash")
 	if err != nil {
@@ -139,11 +139,16 @@ func SetBashShell(m MonitoredCmd) MonitoredCmd {
 
 // SetCmdDir is a functional option that adds a Dir property to the underlying
 // command. Dir is the directory to execute the command from
-func SetCmdDir(dir string) MonitoredCmdOption {
-	return func(m MonitoredCmd) MonitoredCmd {
+func SetCmdDir(dir string) CmdOption {
+	return func(m Cmd) Cmd {
+		if dir[0] == '~' {
+			dir = fmt.Sprintf("$HOME%s", dir[1:])
+		}
 		expandedDir := os.ExpandEnv(dir)
-		if _, err := os.Stat(expandedDir); os.IsNotExist(err) {
-			panic(fmt.Sprintf("Directory does not exist %s\nNOTE: use $HOME, not ~", err))
+
+		_, err := os.Stat(expandedDir)
+		if os.IsNotExist(err) {
+			panic(fmt.Sprintf("Directory %q does not exist: %s", dir, err))
 		}
 
 		m.command.Dir = expandedDir
@@ -153,23 +158,23 @@ func SetCmdDir(dir string) MonitoredCmdOption {
 
 // SetSilenceOutput sets the command's Stdout and Stderr to nil so no output
 // will be seen in the terminal
-func SetSilenceOutput(m MonitoredCmd) MonitoredCmd {
+func SetSilenceOutput(m Cmd) Cmd {
 	m.silenceOutput = true
 	return m
 }
 
 // SetCmdName is a functional option that sets a monitored command's name,
 // which is used to prefix each line written to Stdout
-func SetCmdName(name string) MonitoredCmdOption {
-	return func(m MonitoredCmd) MonitoredCmd {
+func SetCmdName(name string) CmdOption {
+	return func(m Cmd) Cmd {
 		m.name = name
 		return m
 	}
 }
 
 // SetColor is a functional option that sets the ansiColor for the outputs
-func SetColor(terminalColor string) MonitoredCmdOption {
-	return func(m MonitoredCmd) MonitoredCmd {
+func SetColor(terminalColor string) CmdOption {
+	return func(m Cmd) Cmd {
 		m.ansiColor = terminalColor
 		return m
 	}
@@ -178,8 +183,8 @@ func SetColor(terminalColor string) MonitoredCmdOption {
 // SetReadyPattern is a functional option that takes in a pattern string
 // that must compile into a valid regexp and sets it to monitored command's
 // readyPattern field
-func SetReadyPattern(pattern string) MonitoredCmdOption {
-	return func(m MonitoredCmd) MonitoredCmd {
+func SetReadyPattern(pattern string) CmdOption {
+	return func(m Cmd) Cmd {
 		m.readyPattern = regexp.MustCompile(pattern)
 		return m
 	}
@@ -188,8 +193,8 @@ func SetReadyPattern(pattern string) MonitoredCmdOption {
 // SetDependsOn is a functional option that sets a slice of dependencies
 // for this command. The dependencies are names of commands that need to be done
 // or ready prior to this command starting
-func SetDependsOn(cmdNames []string) MonitoredCmdOption {
-	return func(m MonitoredCmd) MonitoredCmd {
+func SetDependsOn(cmdNames []string) CmdOption {
+	return func(m Cmd) Cmd {
 		m.dependsOn = cmdNames
 		return m
 	}
@@ -198,14 +203,14 @@ func SetDependsOn(cmdNames []string) MonitoredCmdOption {
 // SetEnvironment is a functional option that adds export commands to the start
 // of a command. This is a bit of a hacky workaround to maintain exec.Cmd's
 // default environment, while being able to set additional variables
-func SetEnvironment(envMap map[string]string) MonitoredCmdOption {
+func SetEnvironment(envMap map[string]string) CmdOption {
 	var envSlice []string
 	for k, v := range envMap {
 		envSlice = append(envSlice, k+"="+v)
 	}
 
 	exportString := "export " + strings.Join(envSlice, " && export ") + " && "
-	return func(m MonitoredCmd) MonitoredCmd {
+	return func(m Cmd) Cmd {
 		m.command.Args[2] = exportString + m.command.Args[2]
 		return m
 	}
