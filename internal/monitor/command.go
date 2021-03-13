@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
-	"syscall"
 
 	"github.com/pkg/errors"
 )
@@ -77,7 +76,7 @@ func (m *MonitoredCmd) Interrupt() {
 	}
 	// Note: if the underlying process does not handle interrupt signals,
 	// it will probably just keep running
-	err := m.command.Process.Signal(syscall.SIGINT)
+	err := m.command.Process.Signal(os.Interrupt)
 	if err != nil {
 		fmt.Printf("Error sending interrupt to %s: %v\n", m.name, err)
 	}

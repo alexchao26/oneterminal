@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -41,7 +40,7 @@ func (orch *Orchestrator) AddCommands(commands ...*MonitoredCmd) {
 // or being interrupted
 func (orch *Orchestrator) RunCommands() {
 	signalChan := make(chan os.Signal)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
+	signal.Notify(signalChan, os.Interrupt, os.Kill)
 
 	go func() {
 		<-signalChan
