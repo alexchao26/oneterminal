@@ -1,4 +1,4 @@
-package monitor
+package cmdsync
 
 import (
 	"fmt"
@@ -10,12 +10,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Cmd is a wrapper around exec.Cmd
+// Cmd is a wrapper around exec.Cmd that eases syncing to other Cmd's via Group.
 //
 // Its implementation calls the shell directly (through zsh/bash)
 //
-// Cmd can indicate that the underlying process is ready by either
-// matching a regexp or if the underlying process exits.
+// Cmd can indicate that the underlying process has reached a "ready state" by
+//     1. Its stdout/stderr outputs matching a given regexp.
+//     2. Its underlying process completing/exiting with a non-zero code.
+//
 // An interrupt signal can be sent to the underlying process via Interrupt().
 type Cmd struct {
 	command       *exec.Cmd
@@ -66,20 +68,21 @@ func (m *Cmd) Run() error {
 // TODO add RunContext method for another synchronization option
 
 // Interrupt will send an interrupt signal to the process
-func (m *Cmd) Interrupt() {
+func (m *Cmd) Interrupt() error {
 	// Process has not started yet
 	if m.command.Process == nil || m.command.ProcessState == nil {
-		return
+		return nil
 	}
 	if m.command.ProcessState.Exited() {
-		return
+		return nil
 	}
 	// Note: if the underlying process does not handle interrupt signals,
 	// it will probably just keep running
 	err := m.command.Process.Signal(os.Interrupt)
 	if err != nil {
-		fmt.Printf("Error sending interrupt to %s: %v\n", m.name, err)
+		return errors.Wrapf(err, "Error sending interrupt to %s", m.name)
 	}
+	return nil
 }
 
 // Write implements io.Writer, so that Cmd itself can be used for

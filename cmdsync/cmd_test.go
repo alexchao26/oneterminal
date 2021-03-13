@@ -1,4 +1,4 @@
-package monitor
+package cmdsync
 
 import (
 	"strings"

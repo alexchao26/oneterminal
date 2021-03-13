@@ -1,4 +1,4 @@
-package monitor
+package cmdsync
 
 import (
 	"context"
@@ -113,6 +113,9 @@ func (g *Group) Run(ctx context.Context) error {
 
 // SendInterrupts relays an interrupt signal to all underlying commands
 func (g *Group) SendInterrupts() {
+	if !g.hasStarted {
+		return
+	}
 	for _, cmd := range g.commands {
 		cmd.Interrupt()
 	}

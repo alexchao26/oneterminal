@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/alexchao26/oneterminal/internal/cli/commands"
-	"github.com/alexchao26/oneterminal/internal/monitor"
+	"github.com/alexchao26/oneterminal/cmdsync"
 	"github.com/alexchao26/oneterminal/internal/yaml"
 	"github.com/spf13/cobra"
 )
@@ -52,9 +51,9 @@ func init() {
 		rootCmd.AddCommand(cmd)
 	}
 
-	rootCmd.AddCommand(commands.ExampleCmd)
-	rootCmd.AddCommand(commands.CompletionCmd)
-	rootCmd.AddCommand(commands.VersionCmd)
+	rootCmd.AddCommand(ExampleCmd)
+	rootCmd.AddCommand(CompletionCmd)
+	rootCmd.AddCommand(VersionCmd)
 }
 
 func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
@@ -86,36 +85,36 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 			Long:  config.Long,
 			Run: func(cmd *cobra.Command, args []string) {
 				// Setup Orchestrator and its commands
-				group := monitor.NewGroup()
+				group := cmdsync.NewGroup()
 				var colorIndex int
 
 				for _, cmd := range config.Commands {
-					var options []monitor.CmdOption
+					var options []cmdsync.CmdOption
 					if cmd.Name != "" {
-						options = append(options, monitor.SetCmdName(cmd.Name))
-						options = append(options, monitor.SetColor(ansiColors[colorIndex]))
+						options = append(options, cmdsync.SetCmdName(cmd.Name))
+						options = append(options, cmdsync.SetColor(ansiColors[colorIndex]))
 						colorIndex++
 					}
 					if config.Shell == "bash" {
-						options = append(options, monitor.SetBashShell)
+						options = append(options, cmdsync.SetBashShell)
 					}
 					if cmd.CmdDir != "" {
-						options = append(options, monitor.SetCmdDir(cmd.CmdDir))
+						options = append(options, cmdsync.SetCmdDir(cmd.CmdDir))
 					}
 					if cmd.Silence {
-						options = append(options, monitor.SetSilenceOutput)
+						options = append(options, cmdsync.SetSilenceOutput)
 					}
 					if cmd.ReadyRegexp != "" {
-						options = append(options, monitor.SetReadyPattern(cmd.ReadyRegexp))
+						options = append(options, cmdsync.SetReadyPattern(cmd.ReadyRegexp))
 					}
 					if len(cmd.DependsOn) != 0 {
-						options = append(options, monitor.SetDependsOn(cmd.DependsOn))
+						options = append(options, cmdsync.SetDependsOn(cmd.DependsOn))
 					}
 					if cmd.Environment != nil {
-						options = append(options, monitor.SetEnvironment(cmd.Environment))
+						options = append(options, cmdsync.SetEnvironment(cmd.Environment))
 					}
 
-					c := monitor.NewCmd(cmd.Command, options...)
+					c := cmdsync.NewCmd(cmd.Command, options...)
 
 					group.AddCommands(c)
 				}
