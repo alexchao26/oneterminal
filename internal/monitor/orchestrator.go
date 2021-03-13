@@ -3,7 +3,6 @@ package monitor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -109,7 +108,6 @@ func (orch *Orchestrator) SendInterrupts() {
 func checkDependencies(m *MonitoredCmd, allCmdsMap map[string]*MonitoredCmd) (bool, error) {
 	for _, depName := range m.dependsOn {
 		depCmd, ok := allCmdsMap[depName]
-		log.Println(depName, ok)
 		if !ok {
 			return false, errors.New(fmt.Sprintf("%q depends-on %q, but %q does not exist", m.name, depName, depName))
 		}
