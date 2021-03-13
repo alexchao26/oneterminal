@@ -12,9 +12,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var (
-	configDir string
-)
+// intialized by init(), can be changed for running tests in a tmp directory
+var configDir string
 
 func init() {
 	// initialize configDir, this allows it to be changed for tests

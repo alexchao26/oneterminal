@@ -1,4 +1,4 @@
-package monitor
+package cmdsync
 
 import (
 	"strings"
@@ -8,22 +8,25 @@ import (
 func TestMonitoredCmd_Run(t *testing.T) {
 	for name, tc := range map[string]struct {
 		command             string
-		commandOpts         []MonitoredCmdOption
+		commandOpts         []CmdOption
 		wantOutputToContain []string
 	}{
 		"echo Hello World": {"echo Hello, world!", nil, []string{"Hello, world!"}},
 		"go version":       {"go version", nil, []string{"go version"}},
 		"SetEnvironment Option": {
 			"echo $TEST_ENV_VAR",
-			[]MonitoredCmdOption{
-				SetEnvironment(map[string]string{
+			[]CmdOption{
+				Environment(map[string]string{
 					"TEST_ENV_VAR": "beepboop",
 				}),
 			}, []string{"beepboop"}},
 	} {
 		closure := tc
 		t.Run(name, func(tt *testing.T) {
-			cmd := NewMonitoredCmd(closure.command, closure.commandOpts...)
+			cmd, err := NewCmd(closure.command, closure.commandOpts...)
+			if err != nil {
+				t.Errorf("NewCmd() error want nil, got %v", err)
+			}
 
 			var sb strings.Builder // implements io.Writer
 			cmd.command.Stdout = &sb

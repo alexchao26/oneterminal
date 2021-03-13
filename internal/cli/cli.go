@@ -1,16 +1,17 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/alexchao26/oneterminal/internal/cli/commands"
-	"github.com/alexchao26/oneterminal/internal/monitor"
+	"github.com/alexchao26/oneterminal/cmdsync"
 	"github.com/alexchao26/oneterminal/internal/yaml"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
+// subcommands are added in cli.init()
 var rootCmd = &cobra.Command{
 	Use:   "oneterminal",
 	Short: "oneterminal replaces your multi-tab terminal window setup",
@@ -30,10 +31,10 @@ func Execute() {
 	}
 }
 
-// On initialization, parse all yaml file configs from ~/.config/oneterminal
-// directory and add them to the root command.
+// Parse all yaml file configs from the ~/.config/oneterminal directory and add
+// them to the root command.
+//
 // All commands will be accessible via oneterminal <command-name>
-// where command-name comes from each yaml file.
 func init() {
 	allConfigs, err := yaml.ParseAllConfigs()
 	if err != nil {
@@ -50,9 +51,9 @@ func init() {
 		rootCmd.AddCommand(cmd)
 	}
 
-	rootCmd.AddCommand(commands.ExampleCmd)
-	rootCmd.AddCommand(commands.CompletionCmd)
-	rootCmd.AddCommand(commands.VersionCmd)
+	rootCmd.AddCommand(ExampleCmd)
+	rootCmd.AddCommand(CompletionCmd)
+	rootCmd.AddCommand(VersionCmd)
 }
 
 func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
@@ -84,41 +85,47 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 			Long:  config.Long,
 			Run: func(cmd *cobra.Command, args []string) {
 				// Setup Orchestrator and its commands
-				Orchestrator := monitor.NewOrchestrator()
+				group := cmdsync.NewGroup()
 				var colorIndex int
 
 				for _, cmd := range config.Commands {
-					var options []monitor.MonitoredCmdOption
+					var options []cmdsync.CmdOption
 					if cmd.Name != "" {
-						options = append(options, monitor.SetCmdName(cmd.Name))
-						options = append(options, monitor.SetColor(ansiColors[colorIndex]))
+						options = append(options, cmdsync.CmdName(cmd.Name))
+						options = append(options, cmdsync.SetColor(ansiColors[colorIndex]))
 						colorIndex++
 					}
-					if config.Shell == "bash" {
-						options = append(options, monitor.SetBashShell)
+					if config.Shell != "" {
+						options = append(options, cmdsync.Shell(config.Shell))
 					}
 					if cmd.CmdDir != "" {
-						options = append(options, monitor.SetCmdDir(cmd.CmdDir))
+						options = append(options, cmdsync.CmdDir(cmd.CmdDir))
 					}
 					if cmd.Silence {
-						options = append(options, monitor.SetSilenceOutput)
+						options = append(options, cmdsync.SilenceOutput())
 					}
 					if cmd.ReadyRegexp != "" {
-						options = append(options, monitor.SetReadyPattern(cmd.ReadyRegexp))
+						options = append(options, cmdsync.ReadyPattern(cmd.ReadyRegexp))
 					}
 					if len(cmd.DependsOn) != 0 {
-						options = append(options, monitor.SetDependsOn(cmd.DependsOn))
+						options = append(options, cmdsync.DependsOn(cmd.DependsOn))
 					}
 					if cmd.Environment != nil {
-						options = append(options, monitor.SetEnvironment(cmd.Environment))
+						options = append(options, cmdsync.Environment(cmd.Environment))
 					}
 
-					monitoredCmd := monitor.NewMonitoredCmd(cmd.Command, options...)
+					c, err := cmdsync.NewCmd(cmd.Command, options...)
+					if err != nil {
+						panic(fmt.Sprintf("error making command %q: %v", cmd.Name, err))
+					}
 
-					Orchestrator.AddCommands(monitoredCmd)
+					group.AddCommands(c)
 				}
 
-				Orchestrator.RunCommands()
+				err := group.Run(context.Background())
+				if err != nil {
+					fmt.Printf("running %q: %v\n", config.Name, err)
+				}
 			},
 		}
 
