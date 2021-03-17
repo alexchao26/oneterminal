@@ -73,10 +73,7 @@ func (c *Cmd) Run() error {
 // Interrupt will send an interrupt signal to the process
 func (c *Cmd) Interrupt() error {
 	// Process has not started yet
-	if c.command.Process == nil || c.command.ProcessState == nil {
-		return nil
-	}
-	if c.command.ProcessState.Exited() {
+	if c.command.Process == nil {
 		return nil
 	}
 	// Note: if the underlying process does not handle interrupt signals,
