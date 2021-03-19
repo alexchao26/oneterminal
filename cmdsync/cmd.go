@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 )
@@ -36,6 +37,9 @@ type CmdOption func(*Cmd) error
 // e.g. monitor.NewCmd("echo hello", monitor.SetBashShell)
 func NewCmd(command string, options ...CmdOption) (*Cmd, error) {
 	execCmd := exec.Command("zsh", "-c", command)
+	// inherit process group ID's so syscall.Kill reaches ALL child processes
+	// https://bigkevmcd.github.io/go/pgrp/context/2019/02/19/terminating-processes-in-go.html
+	execCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	c := &Cmd{
 		command: execCmd,
@@ -72,13 +76,15 @@ func (c *Cmd) Run() error {
 
 // Interrupt will send an interrupt signal to the process
 func (c *Cmd) Interrupt() error {
-	// Process has not started yet
-	if c.command.Process == nil {
+	// Process is not set if it has not been started yet
+	if c.command == nil || c.command.Process == nil {
 		return nil
 	}
-	// Note: if the underlying process does not handle interrupt signals,
-	// it will probably just keep running
-	err := c.command.Process.Signal(os.Interrupt)
+
+	// send an interrupt to the entire process group to reach "grandchildren"
+	// https://bigkevmcd.github.io/go/pgrp/context/2019/02/19/terminating-processes-in-go.html
+	// is syscall.SIGINT okay here? might need to be SIGTERM/SIGKILL
+	err := syscall.Kill(-c.command.Process.Pid, syscall.SIGINT)
 	if err != nil {
 		return errors.Wrapf(err, "Error sending interrupt to %s", c.name)
 	}
