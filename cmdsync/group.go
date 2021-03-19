@@ -13,10 +13,9 @@ import (
 
 // Group manages scheduling concurrent Cmds
 type Group struct {
-	commands      []*Cmd
-	hasStarted    bool
-	isInterrupted bool
-	mut           sync.RWMutex
+	commands   []*Cmd
+	hasStarted bool
+	mut        sync.RWMutex
 }
 
 // NewGroup makes a new Group
@@ -48,21 +47,9 @@ func (g *Group) AddCommands(commands ...*Cmd) error {
 //
 // The returned error is the first error returned from the Group's Cmds, if any
 func (g *Group) Run(ctx context.Context) error {
+	g.mut.Lock()
 	g.hasStarted = true
-
-	signalChan := make(chan os.Signal)
-	signal.Notify(signalChan, os.Interrupt, os.Kill)
-	go func() {
-		select {
-		case <-ctx.Done():
-		case <-signalChan:
-		}
-		g.mut.Lock()
-		g.isInterrupted = true
-		g.mut.Unlock()
-		g.SendInterrupts()
-	}()
-	defer close(signalChan)
+	g.mut.Unlock()
 
 	namesToCmds := make(map[string]*Cmd, len(g.commands))
 	for _, cmd := range g.commands {
@@ -71,26 +58,33 @@ func (g *Group) Run(ctx context.Context) error {
 
 	eg, ctx := errgroup.WithContext(ctx)
 
+	signalChan := make(chan os.Signal)
+	signal.Notify(signalChan, os.Interrupt, os.Kill)
+	go func() {
+		// events that could lead to a shutdown:
+		// 1. ctx is ended (from parent or errgroup Go routine returning non-nil error)
+		// 2. signal is received (ctrl + c)
+		select {
+		case <-ctx.Done():
+		case <-signalChan:
+		}
+		g.SendInterrupts()
+	}()
+	defer close(signalChan)
+
 	for _, cmd := range g.commands {
 		cmd := cmd
 		eg.Go(func() error {
 			ticker := time.NewTicker(time.Millisecond * 200)
 			defer ticker.Stop()
-			// on every tick, exit if context has been cancelled or group's been
-			// interrupted. then check all depends-on Cmds' ready state
+			// on every tick, exit if context is done (shutdown has started)
+			// then start command if all depends-on Cmds' are in a ready state
 			for {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
 				case <-ticker.C:
 				}
-
-				g.mut.RLock()
-				if g.isInterrupted {
-					g.mut.RUnlock()
-					return nil
-				}
-				g.mut.RUnlock()
 
 				canStart, err := checkDependencies(cmd, namesToCmds)
 				if err != nil {
