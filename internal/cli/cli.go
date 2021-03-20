@@ -72,11 +72,8 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 
 	var cobraCommands []*cobra.Command
 
-	for _, configPointer := range configs {
-		// this assignment to config is needed because ranging for loop assign a
-		// pointer that iterates thorugh a slice, i.e. all commands would end up
-		// being overwritten with the last config/element in the slice
-		config := configPointer
+	for _, config := range configs {
+		config := config
 
 		// create the final cobra command and add it to the root command
 		cobraCommand := &cobra.Command{
@@ -84,7 +81,6 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 			Short: config.Short,
 			Long:  config.Long,
 			Run: func(cmd *cobra.Command, args []string) {
-				// Setup Orchestrator and its commands
 				group := cmdsync.NewGroup()
 				var colorIndex int
 
@@ -92,11 +88,8 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 					var options []cmdsync.CmdOption
 					if cmd.Name != "" {
 						options = append(options, cmdsync.CmdName(cmd.Name))
-						options = append(options, cmdsync.SetColor(ansiColors[colorIndex]))
+						options = append(options, cmdsync.SetColor(ansiColors[colorIndex%len(ansiColors)]))
 						colorIndex++
-					}
-					if config.Shell != "" {
-						options = append(options, cmdsync.Shell(config.Shell))
 					}
 					if cmd.CmdDir != "" {
 						options = append(options, cmdsync.CmdDir(cmd.CmdDir))
@@ -114,7 +107,7 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 						options = append(options, cmdsync.Environment(cmd.Environment))
 					}
 
-					c, err := cmdsync.NewCmd(cmd.Command, options...)
+					c, err := cmdsync.NewCmd(config.Shell, cmd.Command, options...)
 					if err != nil {
 						panic(fmt.Sprintf("error making command %q: %v", cmd.Name, err))
 					}

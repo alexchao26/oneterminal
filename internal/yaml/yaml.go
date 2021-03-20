@@ -169,7 +169,7 @@ var exampleConfig = []byte(
 	`# The name of the command. Alphanumeric, dash and hypens are accepted
 name: somename
 
-# shell to use (zsh|bash), defaults to zsh
+# shell to use (zsh|bash|sh), defaults to zsh
 shell: zsh
 
 # a short description of what this command does

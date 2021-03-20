@@ -1,22 +1,30 @@
 # oneterminal to rule them all!
 
-A configurable CLI to run multiple terminal windows within a single command.
+A configurable CLI to run multiple terminal windows from a single command.
 
 # Overview
 
 onetermainl is a CLI written in [Go](https://golang.org/). Each command is configured in a YAML file stored in the ~/.config/oneterminal directory. For more details on how to configure a command, refer to [example configurations](#example-configurations).
 
-It has been built and tested on macOS with the zsh shell, but should work for bash as well (and maybe linux?).
-
-
 # How to Install
 
 If you have a local [Go installation](https://golang.org/doc/install):
+
+For Go 1.16+ use [`go install`](https://golang.org/doc/go1.16#go-command):
 ```go
-go get github.com/alexchao26/oneterminal/cmd/oneterminal
+go install github.com/alexchao26/oneterminal@latest
 ```
 
-Alternatively, without a local Go installation, you can download the binary directly from the [Github releases](https://github.com/alexchao26/oneterminal/releases).
+For older Go versions:
+```go
+go get -u github.com/alexchao26/oneterminal
+```
+
+### From Github releases
+Alternatively, you can download the binary directly from the [Github releases](https://github.com/alexchao26/oneterminal/releases).
+
+Note that development was mostly on a Mac with `go version go1.15.6 darwin/amd` and some standard library packages (like [os/exec](https://golang.org/pkg/os/exec/)) do not have full support on Windows.
+
 Move this file into somewhere in your $PATH environment variable and make it executable.
 ```shell
 # make executable
@@ -29,9 +37,6 @@ $ echo $PATH
 $ mv /path/to/oneterminal /usr/local/bin
 ```
 
-Note: Installation via brew is in the works.
-
-
 # Example Configurations
 
 ## Utilizing the example config generator
@@ -40,7 +45,7 @@ Note: Installation via brew is in the works.
 # The name of the command. Alphanumeric, dash and hypens are accepted
 name: somename
 
-# shell to use (zsh|bash), defaults to zsh
+# shell to use (zsh|bash|sh), defaults to zsh
 shell: zsh
 
 # a short description of what this command does
