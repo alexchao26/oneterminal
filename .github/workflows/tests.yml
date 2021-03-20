@@ -1,12 +1,12 @@
-name: goreleaser
+name: go-test
 
 on:
-  push:
-    tags:
-      - 'v*'
+  pull_request:
+    branches:
+      - 'main'
 
 jobs:
-  goreleaser:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,10 +21,3 @@ jobs:
         run: |
           go mod tidy
           go test -v ./...
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          version: latest
-          args: release --rm-dist
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

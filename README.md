@@ -25,18 +25,6 @@ Alternatively, you can download the binary directly from the [Github releases](h
 
 Note that development was mostly on a Mac with `go version go1.15.6 darwin/amd` and some standard library packages (like [os/exec](https://golang.org/pkg/os/exec/)) do not have full support on Windows.
 
-Move this file into somewhere in your $PATH environment variable and make it executable.
-```shell
-# make executable
-$ chmod -x /path/to/oneterminal
-
-# To view your path variable
-$ echo $PATH
-
-# potentially move it to /usr/local/bin
-$ mv /path/to/oneterminal /usr/local/bin
-```
-
 # Example Configurations
 
 ## Utilizing the example config generator
