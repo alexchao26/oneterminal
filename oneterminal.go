@@ -7,8 +7,9 @@ import (
 	"github.com/alexchao26/oneterminal/internal/cli"
 )
 
-// variable is updated by goreleaser automatically
-var version = "dev"
+// variable is updated by goreleaser automatically but manually added here too
+// for manual/from source builds like `go get/install`
+var version = "0.3.3"
 
 func main() {
 	rootCmd, err := cli.Init(version)
