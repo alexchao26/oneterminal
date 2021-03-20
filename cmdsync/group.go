@@ -2,6 +2,7 @@ package cmdsync
 
 import (
 	"context"
+	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -116,6 +117,7 @@ func (g *Group) SendInterrupts() {
 }
 
 func checkDependencies(cmd *Cmd, allCmdsMap map[string]*Cmd) (bool, error) {
+	log.Printf("dependent on potatoes")
 	for _, depName := range cmd.dependsOn {
 		depCmd, ok := allCmdsMap[depName]
 		if !ok {
