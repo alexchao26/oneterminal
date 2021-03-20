@@ -17,3 +17,4 @@ _bin/*
 # vendor/
 
 .DS_Store
+dist/
