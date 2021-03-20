@@ -6,14 +6,12 @@ A configurable CLI to run multiple terminal windows from a single command.
 
 onetermainl is a CLI written in [Go](https://golang.org/). Each command is configured in a YAML file stored in the ~/.config/oneterminal directory. For more details on how to configure a command, refer to [example configurations](#example-configurations).
 
-Defaults to `zsh` as shell, also supports `bash` and `sh`.
-
 # How to Install
 
 If you have a local [Go installation](https://golang.org/doc/install):
 
 For Go 1.16+ use [`go install`](https://golang.org/doc/go1.16#go-command):
-```shell
+```go
 go install github.com/alexchao26/oneterminal@latest
 ```
 
