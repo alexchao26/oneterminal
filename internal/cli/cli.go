@@ -3,46 +3,36 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/alexchao26/oneterminal/cmdsync"
 	"github.com/alexchao26/oneterminal/internal/yaml"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-// rootCmd represents the base command when called without any subcommands
-// subcommands are added in cli.init()
-var rootCmd = &cobra.Command{
-	Use:   "oneterminal",
-	Short: "oneterminal replaces your multi-tab terminal window setup",
-	Long: `oneterminal makes shell scripts configurable via yaml.
+// Init creates the root command by parsing all yaml configs from the
+// ~/.config/oneterminal directory and adding them to the root command.
+//
+// All commands will be accessible via oneterminal <command-name>
+func Init(version string) (*cobra.Command, error) {
+	rootCmd := &cobra.Command{
+		Use:   "oneterminal",
+		Short: "oneterminal replaces your multi-tab terminal window setup",
+		Long: `oneterminal makes shell scripts configurable via yaml.
 It strives to reduce the number of terminal windows
 that need to be open.
 
 Config files live in ~/.config/oneterminal
 Run "oneterminal example" to generate an example config file`,
-}
-
-// Execute the root command
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
 	}
-}
 
-// Parse all yaml file configs from the ~/.config/oneterminal directory and add
-// them to the root command.
-//
-// All commands will be accessible via oneterminal <command-name>
-func init() {
 	allConfigs, err := yaml.ParseAllConfigs()
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrap(err, "parsing yml configs")
 	}
 
-	if yaml.HasNameCollisions(allConfigs) {
-		os.Exit(1)
+	if err := yaml.HasNameCollisions(allConfigs); err != nil {
+		return nil, err
 	}
 
 	generatedCommands := makeCommands(allConfigs)
@@ -53,7 +43,9 @@ func init() {
 
 	rootCmd.AddCommand(ExampleCmd)
 	rootCmd.AddCommand(CompletionCmd)
-	rootCmd.AddCommand(VersionCmd)
+	rootCmd.AddCommand(makeVersionCmd(version))
+
+	return rootCmd, nil
 }
 
 func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {

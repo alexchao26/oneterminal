@@ -80,9 +80,9 @@ func ParseAllConfigs() ([]OneTerminalConfig, error) {
 	return allConfigs, nil
 }
 
-// HasNameCollisions ensures there are no duplicate names and doesn't use
-// reserved names
-func HasNameCollisions(configs []OneTerminalConfig) bool {
+// HasNameCollisions returns an error if multiple configs have the same name or
+// one of the reserved names (completion, example or help)
+func HasNameCollisions(configs []OneTerminalConfig) error {
 	reservedNames := map[string]bool{
 		"completion": true,
 		"example":    true,
@@ -92,18 +92,16 @@ func HasNameCollisions(configs []OneTerminalConfig) bool {
 	allNames := make(map[string]bool)
 	for _, config := range configs {
 		if allNames[config.Name] {
-			fmt.Printf("duplicate command name used %s\n", config.Name)
-			return true
+			return errors.Errorf("duplicate name: %q", config.Name)
 		}
 		allNames[config.Name] = true
 
 		if reservedNames[config.Name] {
-			fmt.Printf("reserved name used %s\n", config.Name)
-			return true
+			return errors.Errorf("reserved name used: %q", config.Name)
 		}
 	}
 
-	return false
+	return nil
 }
 
 // MakeExampleConfigFromStruct will generate an example config file in the
