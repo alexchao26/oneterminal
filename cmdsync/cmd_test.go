@@ -1,9 +1,26 @@
 package cmdsync
 
 import (
+	"log"
+	"os/exec"
 	"strings"
 	"testing"
 )
+
+var shell string
+
+func init() {
+	for _, s := range []string{"zsh", "bash", "sh"} {
+		_, err := exec.LookPath(s)
+		if err != nil {
+			log.Printf("%q shell not installed", s)
+			continue
+		}
+		shell = s
+		return
+	}
+	panic("no supported shell installed, tried zsh, bash and sh")
+}
 
 func TestMonitoredCmd_Run(t *testing.T) {
 	for name, tc := range map[string]struct {
@@ -23,7 +40,7 @@ func TestMonitoredCmd_Run(t *testing.T) {
 	} {
 		closure := tc
 		t.Run(name, func(tt *testing.T) {
-			cmd, err := NewCmd(closure.command, closure.commandOpts...)
+			cmd, err := NewCmd(shell, closure.command, closure.commandOpts...)
 			if err != nil {
 				t.Errorf("NewCmd() error want nil, got %v", err)
 			}
