@@ -32,11 +32,21 @@ type Cmd struct {
 
 type CmdOption func(*Cmd) error
 
-// NewCmd makes a command that can be interrupted
-// Default shell used is zsh, use functional options to change
-// e.g. monitor.NewCmd("echo hello", monitor.SetBashShell)
-func NewCmd(command string, options ...CmdOption) (*Cmd, error) {
-	execCmd := exec.Command("zsh", "-c", command)
+// NewCmd defaults to using zsh. bash and sh are also supported
+func NewCmd(shell, command string, options ...CmdOption) (*Cmd, error) {
+	if shell == "" {
+		shell = "zsh"
+	}
+	allowedShells := map[string]bool{
+		"zsh":  true,
+		"bash": true,
+		"sh":   true,
+	}
+	if !allowedShells[shell] {
+		return nil, errors.Errorf("%q shell not supported. Use zsh|bash|sh", shell)
+	}
+
+	execCmd := exec.Command(shell, "-c", command)
 	// inherit process group ID's so syscall.Kill reaches ALL child processes
 	// https://bigkevmcd.github.io/go/pgrp/context/2019/02/19/terminating-processes-in-go.html
 	execCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -132,29 +142,6 @@ func prefixEveryline(in, prefix string) (out string) {
 // IsReady is a simple getter for the ready state of a monitored command
 func (c *Cmd) IsReady() bool {
 	return c.ready
-}
-
-// Shell is a functional option to change the executing shell to zsh
-func Shell(shell string) CmdOption {
-	return func(c *Cmd) error {
-		allowedShells := map[string]bool{
-			"zsh":  true,
-			"bash": true,
-			"sh":   true,
-		}
-		if !allowedShells[shell] {
-			return errors.Errorf("%q shell not supported. Use zsh|bash|sh", shell)
-		}
-
-		c.command.Args[0] = shell
-		resolvedPath, err := exec.LookPath(shell)
-		if err != nil {
-			return errors.Errorf("Error resolving %q shell: %v", shell, err)
-		}
-
-		c.command.Path = resolvedPath
-		return nil
-	}
 }
 
 // CmdDir is a functional option that modifies the Dir property of the
