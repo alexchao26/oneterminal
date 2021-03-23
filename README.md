@@ -1,10 +1,11 @@
 # oneterminal to rule them all!
 
 A configurable CLI to run multiple terminal windows from a single command.
+![example command](.github/carbon_example.png)
 
 # Overview
 
-onetermainl is a CLI written in [Go](https://golang.org/). Each command is configured in a YAML file stored in the ~/.config/oneterminal directory. For more details on how to configure a command, refer to [example configurations](#example-configurations).
+oneterminal is a CLI written in [Go](https://golang.org/). Each command is configured in a YAML file stored in the ~/.config/oneterminal directory. For more details on how to configure a command, refer to [example configurations](#example-configurations).
 
 # How to Install
 
@@ -30,7 +31,7 @@ Note that development was mostly on a Mac with `go version go1.15.6 darwin/amd` 
 ## Utilizing the example config generator
 `oneterminal example` will create a config at ~/.config/oneterminal/example.yml containing helpful comments about each yaml field
 ```yaml
-# The name of the command. Alphanumeric, dash and hypens are accepted
+# The name of the command. Alphanumeric, dash and hyphens are accepted
 name: somename
 
 # shell to use (zsh|bash|sh), defaults to zsh

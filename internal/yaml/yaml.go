@@ -164,7 +164,7 @@ func MakeExampleConfigWithInstructions(filename string) error {
 }
 
 var exampleConfig = []byte(
-	`# The name of the command. Alphanumeric, dash and hypens are accepted
+	`# The name of the command. Alphanumeric, dash and hyphens are accepted
 name: somename
 
 # shell to use (zsh|bash|sh), defaults to zsh
