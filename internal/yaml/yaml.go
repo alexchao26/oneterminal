@@ -87,6 +87,7 @@ func HasNameCollisions(configs []OneTerminalConfig) error {
 		"completion": true,
 		"example":    true,
 		"help":       true,
+		"update":     true,
 	}
 
 	allNames := make(map[string]bool)
