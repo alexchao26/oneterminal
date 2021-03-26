@@ -43,6 +43,7 @@ Run "oneterminal example" to generate an example config file`,
 
 	rootCmd.AddCommand(ExampleCmd)
 	rootCmd.AddCommand(CompletionCmd)
+	rootCmd.AddCommand(makeUpdateCmd(version))
 	rootCmd.AddCommand(makeVersionCmd(version))
 
 	return rootCmd, nil

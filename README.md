@@ -24,7 +24,7 @@ go get -u github.com/alexchao26/oneterminal
 ### From Github releases
 Alternatively, you can download the binary directly from the [Github releases](https://github.com/alexchao26/oneterminal/releases).
 
-Note that development was mostly on a Mac with `go version go1.15.6 darwin/amd` and some standard library packages (like [os/exec](https://golang.org/pkg/os/exec/)) do not have full support on Windows.
+Note that development was mostly on a Mac with `go version go1.16.2 darwin/amd64` and some standard library packages (like [os/exec](https://golang.org/pkg/os/exec/)) do not have full support on Windows.
 
 # Example Configurations
 
@@ -110,6 +110,7 @@ Command                                  | Description
 `oneterminal completion --help`          | Get helper text to setup shell completion for zsh or bash shells
 `oneterminal version`                    | Print the version number of oneterminal
 `oneterminal help`                       | Help about any command
+`oneterminal update`                     | Updates oneterminal to latest release
 `oneterminal <your-configured-commands>` | Your commands configured via ~/.config/oneterminal/*.yml
 
 # Contributing to oneterminal
