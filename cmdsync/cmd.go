@@ -46,7 +46,7 @@ func NewShellCmd(shell, command string, options ...ShellCmdOption) (*ShellCmd, e
 		return nil, errors.Errorf("%q shell not supported. Use zsh|bash|sh", shell)
 	}
 
-	execCmd := exec.Command(shell, "-s", command)
+	execCmd := exec.Command(shell, "-c", command)
 	// inherit process group ID's so syscall.Kill reaches ALL child processes
 	// https://bigkevmcd.github.io/go/pgrp/context/2019/02/19/terminating-processes-in-go.html
 	execCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
