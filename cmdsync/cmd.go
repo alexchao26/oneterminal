@@ -1,6 +1,7 @@
 package cmdsync
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -71,18 +72,34 @@ func NewShellCmd(shell, command string, options ...ShellCmdOption) (*ShellCmd, e
 
 // Run the underlying command. This function blocks until the command exits
 func (s *ShellCmd) Run() error {
+	return s.RunContext(context.Background())
+}
+
+// RunContext is the same as Run but cancels if the ctx cancels
+func (s *ShellCmd) RunContext(ctx context.Context) error {
 	// start the command's execution
 	if err := s.command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}
 
-	// blocks until underlying process is done/exits
-	err := s.command.Wait()
+	// make waiting for cmd to run concurrent so select can be used
+	done := make(chan error, 1)
+	go func() {
+		done <- s.command.Wait()
+	}()
+
+	var err error
+	// blocks until underlying process is done/exits or ctx is done
+	select {
+	case <-ctx.Done():
+		err = ctx.Err()
+		s.Interrupt()
+	case doneErr := <-done:
+		err = doneErr
+	}
 	s.ready = true
 	return err
 }
-
-// TODO add RunContext method for another synchronization option
 
 // Interrupt will send an interrupt signal to the process
 func (s *ShellCmd) Interrupt() error {

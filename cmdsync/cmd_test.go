@@ -10,6 +10,7 @@ import (
 var shell string
 
 func init() {
+	// find a shell that can be used for tests
 	for _, s := range []string{"zsh", "bash", "sh"} {
 		_, err := exec.LookPath(s)
 		if err != nil {
@@ -22,58 +23,67 @@ func init() {
 	panic("no supported shell installed, tried zsh, bash and sh")
 }
 
-func TestMonitoredCmd_Run(t *testing.T) {
-	for name, tc := range map[string]struct {
+func TestShellCmd_Run(t *testing.T) {
+	tests := map[string]struct {
 		command             string
 		commandOpts         []ShellCmdOption
 		wantOutputToContain []string
+		wantErr             bool
 	}{
-		"echo Hello World": {"echo Hello, world!", nil, []string{"Hello, world!"}},
-		"go version":       {"go version", nil, []string{"go version"}},
+		"echo Hello World": {"echo Hello, world!", nil, []string{"Hello, world!"}, false},
+		"go version":       {"go version", nil, []string{"go version"}, false},
 		"SetEnvironment Option": {
 			"echo $TEST_ENV_VAR",
 			[]ShellCmdOption{
 				Environment(map[string]string{
 					"TEST_ENV_VAR": "beepboop",
 				}),
-			}, []string{"beepboop"}},
-	} {
-		closure := tc
-		t.Run(name, func(tt *testing.T) {
-			cmd, err := NewShellCmd(shell, closure.command, closure.commandOpts...)
+			}, []string{"beepboop"},
+			false},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Log(name, tt.command)
+			shCmd, err := NewShellCmd(shell, tt.command, tt.commandOpts...)
 			if err != nil {
-				t.Errorf("NewCmd() error want nil, got %v", err)
+				t.Errorf("NewShellCmd() error want nil, got %v", err)
 			}
 
 			var sb strings.Builder // implements io.Writer
-			cmd.command.Stdout = &sb
-			cmd.command.Stderr = &sb
-			cmd.Run()
+			shCmd.command.Stdout = &sb
+			shCmd.command.Stderr = &sb
+			err = shCmd.Run()
+
+			if tt.wantErr && err == nil {
+				t.Errorf("shCmd.Run() want err, got nil")
+			}
+			if tt.wantErr == false && err != nil {
+				t.Errorf("shCmd.Run() want err = nil, got %v", err)
+			}
 
 			outputs := sb.String()
-
-			for _, wantPiece := range closure.wantOutputToContain {
+			for _, wantPiece := range tt.wantOutputToContain {
 				if !strings.Contains(outputs, wantPiece) {
-					tt.Errorf("cmd.Run() = %s, want it to contain %s", outputs, wantPiece)
+					t.Errorf("shCmd.Run() = %q, want it to contain %q", outputs, wantPiece)
 				}
 			}
 		})
 	}
 }
 
-var prefixEachLineTests = []struct {
-	input, prefix, want string
-}{
-	{"hi", "pre-1", "pre-1 | hi\n"},
-	{"hello\nasdf", "cmd", "cmd | hello\ncmd | asdf\n"},
-	{"Starting...\nWaiting...\nReady!", "launcher", "launcher | Starting...\nlauncher | Waiting...\nlauncher | Ready!\n"},
-}
-
 func TestPrefixEachLine(t *testing.T) {
-	for _, test := range prefixEachLineTests {
-		actual := prefixEveryline(test.input, test.prefix)
-		if actual != test.want {
-			t.Errorf("Expected %q, got %q", test.want, actual)
+	var tests = []struct {
+		input, prefix, want string
+	}{
+		{"hi", "pre-1", "pre-1 | hi\n"},
+		{"hello\nasdf", "shCmd", "shCmd | hello\nshCmd | asdf\n"},
+		{"Starting...\nWaiting...\nReady!", "launcher", "launcher | Starting...\nlauncher | Waiting...\nlauncher | Ready!\n"},
+	}
+	for _, tt := range tests {
+		actual := prefixEveryline(tt.input, tt.prefix)
+		if actual != tt.want {
+			t.Errorf("Expected %q, got %q", tt.want, actual)
 		}
 	}
 }
