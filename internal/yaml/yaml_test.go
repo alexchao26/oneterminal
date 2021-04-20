@@ -1,7 +1,6 @@
 package yaml
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -14,11 +13,10 @@ func setupTempDir(t *testing.T) {
 
 // testing utility function
 func getFileContents(t *testing.T, path string) string {
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("Reading file: %s; %v", path, err)
 	}
-
 	return string(bytes)
 }
 

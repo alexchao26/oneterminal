@@ -1,10 +1,10 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/alexchao26/oneterminal/cmdsync"
+	"github.com/alexchao26/oneterminal/color"
 	"github.com/alexchao26/oneterminal/internal/yaml"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -37,32 +37,18 @@ Run "oneterminal example" to generate an example config file`,
 
 	generatedCommands := makeCommands(allConfigs)
 
-	for _, cmd := range generatedCommands {
-		rootCmd.AddCommand(cmd)
-	}
+	rootCmd.AddCommand(generatedCommands...)
 
 	rootCmd.AddCommand(ExampleCmd)
 	rootCmd.AddCommand(CompletionCmd)
 	rootCmd.AddCommand(makeUpdateCmd(version))
 	rootCmd.AddCommand(makeVersionCmd(version))
+	rootCmd.AddCommand(makeListCmd(allConfigs))
 
 	return rootCmd, nil
 }
 
 func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
-	ansiColors := []string{
-		"\033[36;1m", // intense cyan
-		"\033[32;1m", // intense green
-		"\033[35;1m", // intense magenta
-		"\033[34;1m", // intense blue
-		"\033[33;1m", // intense yellow
-		"\033[36m",   // cyan
-		"\033[32m",   // green
-		"\033[35m",   // magenta
-		"\033[34m",   // blue
-		"\033[33m",   // yellow
-	}
-
 	var cobraCommands []*cobra.Command
 
 	for _, config := range configs {
@@ -75,14 +61,12 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 			Long:  config.Long,
 			Run: func(cmd *cobra.Command, args []string) {
 				group := cmdsync.NewGroup()
-				var colorIndex int
 
-				for _, cmd := range config.Commands {
-					var options []cmdsync.CmdOption
+				for i, cmd := range config.Commands {
+					var options []cmdsync.ShellCmdOption
 					if cmd.Name != "" {
-						options = append(options, cmdsync.CmdName(cmd.Name))
-						options = append(options, cmdsync.SetColor(ansiColors[colorIndex%len(ansiColors)]))
-						colorIndex++
+						options = append(options, cmdsync.Name(cmd.Name))
+						options = append(options, cmdsync.Color(color.ColorsList[i%len(color.ColorsList)]))
 					}
 					if cmd.CmdDir != "" {
 						options = append(options, cmdsync.CmdDir(cmd.CmdDir))
@@ -100,15 +84,15 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 						options = append(options, cmdsync.Environment(cmd.Environment))
 					}
 
-					c, err := cmdsync.NewCmd(config.Shell, cmd.Command, options...)
+					s, err := cmdsync.NewShellCmd(config.Shell, cmd.Command, options...)
 					if err != nil {
 						panic(fmt.Sprintf("error making command %q: %v", cmd.Name, err))
 					}
 
-					group.AddCommands(c)
+					group.AddCommands(s)
 				}
 
-				err := group.Run(context.Background())
+				err := group.Run()
 				if err != nil {
 					fmt.Printf("running %q: %v\n", config.Name, err)
 				}

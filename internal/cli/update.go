@@ -24,6 +24,8 @@ so a local Go installation is required`,
 			// non-critical error, continue w/ update after logging
 			if err != nil {
 				fmt.Println(err)
+				// for running go install cmd
+				mostRecentVersion = "latest"
 			} else {
 				fmt.Printf("Most recent version is %s\n", mostRecentVersion)
 			}
@@ -50,8 +52,8 @@ so a local Go installation is required`,
 			}
 
 			// will error at c.Run if go is not installed locally
-			fmt.Println("Running `go install github.com/alexchao26/oneterminal@latest`")
-			c := exec.Command("go", "install", "github.com/alexchao26/oneterminal@latest")
+			fmt.Printf("Running `go install github.com/alexchao26/oneterminal@%s`\n", mostRecentVersion)
+			c := exec.Command("go", "install", fmt.Sprintf("github.com/alexchao26/oneterminal@%s", mostRecentVersion))
 			if err := c.Run(); err != nil {
 				fmt.Println("Error:", err)
 				return

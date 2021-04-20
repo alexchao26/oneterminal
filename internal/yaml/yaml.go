@@ -2,11 +2,10 @@ package yaml
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -49,23 +48,28 @@ type Command struct {
 	Environment map[string]string `yaml:"environment,omitempty"`
 }
 
+var isYamlPattern = regexp.MustCompile(".ya?ml$")
+
 // ParseAllConfigs parses and returns configs in ~/.config/oneterminal
 func ParseAllConfigs() ([]OneTerminalConfig, error) {
 	// Unmarshal all values from configDir
 	var allConfigs []OneTerminalConfig
-	files, err := ioutil.ReadDir(configDir)
+	entries, err := os.ReadDir(configDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "reading from config directory")
 	}
 
-	for _, f := range files {
-		if !strings.HasSuffix(f.Name(), ".yml") {
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if !isYamlPattern.MatchString(e.Name()) {
 			continue
 		}
 
-		filename := path.Join(configDir, f.Name())
+		filename := path.Join(configDir, e.Name())
 
-		bytes, err := ioutil.ReadFile(filename)
+		bytes, err := os.ReadFile(filename)
 		if err != nil {
 			return nil, errors.Wrapf(err, "reading file %s", filename)
 		}
@@ -80,16 +84,18 @@ func ParseAllConfigs() ([]OneTerminalConfig, error) {
 	return allConfigs, nil
 }
 
+var reservedNames = map[string]bool{
+	"completion": true,
+	"example":    true,
+	"help":       true,
+	"list":       true,
+	"ls":         true,
+	"update":     true,
+}
+
 // HasNameCollisions returns an error if multiple configs have the same name or
 // one of the reserved names (completion, example or help)
 func HasNameCollisions(configs []OneTerminalConfig) error {
-	reservedNames := map[string]bool{
-		"completion": true,
-		"example":    true,
-		"help":       true,
-		"update":     true,
-	}
-
 	allNames := make(map[string]bool)
 	for _, config := range configs {
 		if allNames[config.Name] {
@@ -145,7 +151,7 @@ Some say you can hear it from space.`,
 	}
 
 	// write to a file
-	err = ioutil.WriteFile(path.Join(configDir, filename), bytes, os.ModePerm)
+	err = os.WriteFile(path.Join(configDir, filename), bytes, os.ModePerm)
 	if err != nil {
 		return errors.Wrap(err, "writing to example config file")
 	}
@@ -156,7 +162,7 @@ Some say you can hear it from space.`,
 // MakeExampleConfigWithInstructions writes an example oneterminal yaml config
 // to ~/.config/oneterminal/example.yml with helpful comments
 func MakeExampleConfigWithInstructions(filename string) error {
-	err := ioutil.WriteFile(path.Join(configDir, filename), exampleConfig, os.ModePerm)
+	err := os.WriteFile(path.Join(configDir, filename), exampleConfig, os.ModePerm)
 	if err != nil {
 		return errors.Wrap(err, "writing to example config file")
 	}
