@@ -88,6 +88,8 @@ var reservedNames = map[string]bool{
 	"completion": true,
 	"example":    true,
 	"help":       true,
+	"list":       true,
+	"ls":         true,
 	"update":     true,
 }
 

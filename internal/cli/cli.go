@@ -37,14 +37,13 @@ Run "oneterminal example" to generate an example config file`,
 
 	generatedCommands := makeCommands(allConfigs)
 
-	for _, cmd := range generatedCommands {
-		rootCmd.AddCommand(cmd)
-	}
+	rootCmd.AddCommand(generatedCommands...)
 
 	rootCmd.AddCommand(ExampleCmd)
 	rootCmd.AddCommand(CompletionCmd)
 	rootCmd.AddCommand(makeUpdateCmd(version))
 	rootCmd.AddCommand(makeVersionCmd(version))
+	rootCmd.AddCommand(makeListCmd(allConfigs))
 
 	return rootCmd, nil
 }
