@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/alexchao26/oneterminal/color"
 	"github.com/pkg/errors"
 )
 
@@ -24,7 +25,7 @@ import (
 type ShellCmd struct {
 	command       *exec.Cmd
 	name          string
-	ansiColor     string
+	color         color.Color
 	silenceOutput bool
 	ready         bool           // if command's dependent's can begin
 	readyPattern  *regexp.Regexp // pattern to match against command outputs
@@ -138,7 +139,7 @@ func (s *ShellCmd) Write(in []byte) (int, error) {
 		_, err = os.Stdout.Write(in)
 	} else {
 		// if command's name is set, print with prefixed outputs
-		prefixed := prefixEveryline(string(in), fmt.Sprintf("%s%s%s", s.ansiColor, s.name, "\033[0m"))
+		prefixed := prefixEveryline(string(in), s.color.Add(s.name))
 		_, err = os.Stdout.Write([]byte(prefixed))
 	}
 
@@ -190,19 +191,19 @@ func SilenceOutput() ShellCmdOption {
 	}
 }
 
-// CmdName is a functional option that sets a monitored command's name,
+// Name is a functional option that sets a monitored command's name,
 // which is used to prefix each line written to Stdout
-func CmdName(name string) ShellCmdOption {
+func Name(name string) ShellCmdOption {
 	return func(s *ShellCmd) error {
 		s.name = name
 		return nil
 	}
 }
 
-// SetColor is a functional option that sets the ansiColor for the outputs
-func SetColor(terminalColor string) ShellCmdOption {
+// Color is a functional option that sets the ansiColor for the outputs
+func Color(c color.Color) ShellCmdOption {
 	return func(s *ShellCmd) error {
-		s.ansiColor = terminalColor
+		s.color = c
 		return nil
 	}
 }
@@ -226,8 +227,8 @@ func ReadyPattern(pattern string) ShellCmdOption {
 // or reached a ready state prior to this command starting.
 //
 // Note that there is no validation that the cmdNames are valid/match other
-// ShellCmd's configs (because it would cause a circular dependency). Some, but not
-// all possible config errors are checked at runtime.
+// ShellCmd's configs (because it would cause a circular dependency). Some, but
+// not all possible config errors are checked at runtime.
 func DependsOn(cmdNames []string) ShellCmdOption {
 	return func(s *ShellCmd) error {
 		s.dependsOn = cmdNames
@@ -239,14 +240,13 @@ func DependsOn(cmdNames []string) ShellCmdOption {
 // of a command. This is a bit of a hacky workaround to maintain exec.ShellCmd's
 // default environment, while being able to set additional variables
 func Environment(envMap map[string]string) ShellCmdOption {
-	var envSlice []string
+	var exportVars string
 	for k, v := range envMap {
-		envSlice = append(envSlice, k+"="+v)
+		exportVars += fmt.Sprintf("export %s=%s && ", k, v)
 	}
 
-	exportString := "export " + strings.Join(envSlice, " && export ") + " && "
 	return func(s *ShellCmd) error {
-		s.command.Args[2] = exportString + s.command.Args[2]
+		s.command.Args[2] = exportVars + s.command.Args[2]
 		return nil
 	}
 }

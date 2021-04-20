@@ -41,13 +41,18 @@ func (g *Group) AddCommands(commands ...*ShellCmd) error {
 }
 
 // Run will run all of the group's ShellCmds and block until they have all finished
-// running, or an interrupt/kill signal is received, or the context cancels
+// running, or an interrupt/kill signal is received
 //
 // It checks for each ShellCmd's prerequisites (ShellCmds it depends-on being in a ready
 // state) before starting the ShellCmd
 //
 // The returned error is the first error returned from the Group's ShellCmds, if any
-func (g *Group) Run(ctx context.Context) error {
+func (g *Group) Run() error {
+	return g.RunContext(context.Background())
+}
+
+// RunContext is the same as Run but can also be cancelled via ctx
+func (g *Group) RunContext(ctx context.Context) error {
 	g.mut.Lock()
 	g.hasStarted = true
 	g.mut.Unlock()
