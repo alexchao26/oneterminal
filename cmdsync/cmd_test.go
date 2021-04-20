@@ -25,14 +25,14 @@ func init() {
 func TestMonitoredCmd_Run(t *testing.T) {
 	for name, tc := range map[string]struct {
 		command             string
-		commandOpts         []CmdOption
+		commandOpts         []ShellCmdOption
 		wantOutputToContain []string
 	}{
 		"echo Hello World": {"echo Hello, world!", nil, []string{"Hello, world!"}},
 		"go version":       {"go version", nil, []string{"go version"}},
 		"SetEnvironment Option": {
 			"echo $TEST_ENV_VAR",
-			[]CmdOption{
+			[]ShellCmdOption{
 				Environment(map[string]string{
 					"TEST_ENV_VAR": "beepboop",
 				}),
@@ -40,7 +40,7 @@ func TestMonitoredCmd_Run(t *testing.T) {
 	} {
 		closure := tc
 		t.Run(name, func(tt *testing.T) {
-			cmd, err := NewCmd(shell, closure.command, closure.commandOpts...)
+			cmd, err := NewShellCmd(shell, closure.command, closure.commandOpts...)
 			if err != nil {
 				t.Errorf("NewCmd() error want nil, got %v", err)
 			}

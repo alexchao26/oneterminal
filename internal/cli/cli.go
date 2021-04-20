@@ -78,7 +78,7 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 				var colorIndex int
 
 				for _, cmd := range config.Commands {
-					var options []cmdsync.CmdOption
+					var options []cmdsync.ShellCmdOption
 					if cmd.Name != "" {
 						options = append(options, cmdsync.CmdName(cmd.Name))
 						options = append(options, cmdsync.SetColor(ansiColors[colorIndex%len(ansiColors)]))
@@ -100,7 +100,7 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 						options = append(options, cmdsync.Environment(cmd.Environment))
 					}
 
-					c, err := cmdsync.NewCmd(config.Shell, cmd.Command, options...)
+					c, err := cmdsync.NewShellCmd(config.Shell, cmd.Command, options...)
 					if err != nil {
 						panic(fmt.Sprintf("error making command %q: %v", cmd.Name, err))
 					}
