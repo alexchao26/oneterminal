@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"github.com/alexchao26/oneterminal/color"
-	"github.com/pkg/errors"
 )
 
 // ShellCmd is a wrapper around exec.Cmd that eases syncing to other ShellCmd's via Group.
@@ -48,7 +47,7 @@ func NewShellCmd(shell, command string, options ...ShellCmdOption) (*ShellCmd, e
 		"sh":   true,
 	}
 	if !allowedShells[shell] {
-		return nil, errors.Errorf("%q shell not supported. Use zsh|bash|sh", shell)
+		return nil, fmt.Errorf("%q shell not supported. Use zsh|bash|sh", shell)
 	}
 
 	execCmd := exec.Command(shell, "-c", command)
@@ -83,7 +82,7 @@ func (s *ShellCmd) Run() error {
 func (s *ShellCmd) RunContext(ctx context.Context) error {
 	// start the command's execution
 	if err := s.command.Start(); err != nil {
-		return errors.Wrap(err, "failed to start command")
+		return fmt.Errorf("failed to start command: %w", err)
 	}
 
 	// make waiting for cmd to run concurrent so select can be used
@@ -117,7 +116,7 @@ func (s *ShellCmd) Interrupt() error {
 	// is syscall.SIGINT okay here? might need to be SIGTERM/SIGKILL
 	err := syscall.Kill(-s.command.Process.Pid, syscall.SIGINT)
 	if err != nil {
-		return errors.Wrapf(err, "Error sending interrupt to %s", s.name)
+		return fmt.Errorf("Error sending interrupt to %s: %w", s.name, err)
 	}
 	return nil
 }
@@ -177,7 +176,7 @@ func CmdDir(dir string) ShellCmdOption {
 
 		_, err := os.Stat(expandedDir)
 		if os.IsNotExist(err) {
-			return errors.Errorf("Directory %q does not exist: %s", dir, err)
+			return fmt.Errorf("Directory %q does not exist: %s", dir, err)
 		}
 
 		s.command.Dir = expandedDir
@@ -218,7 +217,7 @@ func ReadyPattern(pattern string) ShellCmdOption {
 	return func(s *ShellCmd) error {
 		r, err := regexp.Compile(pattern)
 		if err != nil {
-			return errors.Wrapf(err, "compiling regexp %q", pattern)
+			return fmt.Errorf("compiling regexp %q: %w", pattern, err)
 		}
 		s.readyPattern = r
 		return nil

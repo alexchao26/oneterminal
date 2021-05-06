@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
 
@@ -61,7 +60,7 @@ func ParseAllConfigs() ([]OneTerminalConfig, error) {
 	var allConfigs []OneTerminalConfig
 	entries, err := os.ReadDir(configDir)
 	if err != nil {
-		return nil, errors.Wrap(err, "reading from config directory")
+		return nil, fmt.Errorf("reading from config directory: %w", err)
 	}
 
 	for _, e := range entries {
@@ -76,16 +75,16 @@ func ParseAllConfigs() ([]OneTerminalConfig, error) {
 
 		bytes, err := os.ReadFile(filename)
 		if err != nil {
-			return nil, errors.Wrapf(err, "reading file %s", filename)
+			return nil, fmt.Errorf("reading file %s: %w", filename, err)
 		}
 		var oneTermConfig OneTerminalConfig
 		err = yaml.Unmarshal(bytes, &oneTermConfig)
 		if err != nil {
-			return nil, errors.Wrapf(err, "unmarshalling file %s", filename)
+			return nil, fmt.Errorf("unmarshalling file %s: %w", filename, err)
 		}
 		err = validateConfig(oneTermConfig)
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid config from %q", filename)
+			return nil, fmt.Errorf("invalid config from %q: %w", filename, err)
 		}
 
 		allConfigs = append(allConfigs, oneTermConfig)
@@ -130,11 +129,11 @@ func HasNameCollisions(configs []OneTerminalConfig) error {
 	allNames := make(map[string]bool)
 	for _, config := range configs {
 		if allNames[config.Name] || allNames[config.Alias] {
-			return errors.Errorf("duplicate name or alias used: %q or %q", config.Name, config.Alias)
+			return fmt.Errorf("duplicate name or alias used: %q or %q", config.Name, config.Alias)
 		}
 
 		if reservedNames[config.Name] || reservedNames[config.Alias] {
-			return errors.Errorf("reserved name used: %q or %q", config.Name, config.Alias)
+			return fmt.Errorf("reserved name used: %q or %q", config.Name, config.Alias)
 		}
 
 		allNames[config.Name] = true
@@ -151,7 +150,7 @@ func HasNameCollisions(configs []OneTerminalConfig) error {
 func WriteExampleConfig(filename string) error {
 	err := os.WriteFile(path.Join(configDir, filename), exampleConfig, os.ModePerm)
 	if err != nil {
-		return errors.Wrap(err, "writing to example config file")
+		return fmt.Errorf("writing to example config file: %w", err)
 	}
 
 	return nil
