@@ -1,3 +1,5 @@
+// Package yaml is an internal package for parsing config files into a format
+// that is similar to cobra commands.
 package yaml
 
 import (
@@ -31,6 +33,7 @@ func init() {
 // OneTerminalConfig of all the fields from a yaml config
 type OneTerminalConfig struct {
 	Name     string    `yaml:"name"`
+	Alias    string    `yaml:"alias"`
 	Shell    string    `yaml:"shell"`
 	Short    string    `yaml:"short"`
 	Long     string    `yaml:"long,omitempty"`
@@ -106,6 +109,16 @@ func HasNameCollisions(configs []OneTerminalConfig) error {
 		if reservedNames[config.Name] {
 			return errors.Errorf("reserved name used: %q", config.Name)
 		}
+
+		if config.Alias != "" {
+			if allNames[config.Alias] {
+				return errors.Errorf("duplicate name: %q", config.Alias)
+			}
+			allNames[config.Alias] = true
+			if reservedNames[config.Alias] {
+				return errors.Errorf("reserved name used: %q", config.Alias)
+			}
+		}
 	}
 
 	return nil
@@ -116,7 +129,8 @@ func HasNameCollisions(configs []OneTerminalConfig) error {
 // it uses the struct which makes ensure its matches OneTerminalConfig struct
 func MakeExampleConfigFromStruct(filename string) error {
 	exampleConfig := OneTerminalConfig{
-		Name:  "somename",
+		Name:  "example-name",
+		Alias: "exname",
 		Shell: "zsh",
 		Short: "An example command that says hello twice",
 		Long: `A very polite shell command that says
@@ -171,11 +185,12 @@ func MakeExampleConfigWithInstructions(filename string) error {
 }
 
 var exampleConfig = []byte(
-	`# The name of the command. Alphanumeric, dash and hyphens are accepted
-name: somename
+	`# The name of the command, how you'll call the command via $ oneterminal <name>
+name: example-name
+# alias: exname # optional
 
 # shell to use (zsh|bash|sh), defaults to zsh
-shell: zsh
+# shell: zsh
 
 # a short description of what this command does
 short: an example command that says hello twice

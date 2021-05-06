@@ -1,3 +1,4 @@
+// Package cli initializes cobra commands by parsing yaml files.
 package cli
 
 import (
@@ -97,6 +98,11 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 					fmt.Printf("running %q: %v\n", config.Name, err)
 				}
 			},
+		}
+
+		if config.Alias != "" {
+			// intentionally only support a single alias, keeps yaml simpler
+			cobraCommand.Aliases = []string{config.Alias}
 		}
 
 		cobraCommands = append(cobraCommands, cobraCommand)

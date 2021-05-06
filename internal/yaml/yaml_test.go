@@ -30,14 +30,12 @@ func TestMakeExampleConfigFromStruct(t *testing.T) {
 
 	filepath := path.Join(configDir, filename)
 	t.Logf("Wrote to temp file %s\n", filepath)
+	defer os.Remove(filepath)
 
 	fileContents := getFileContents(t, filepath)
 	if len(fileContents) < 50 {
 		t.Errorf("Expected file to be at least 50 characters, got %d", len(fileContents))
 	}
-
-	// remove example file when done
-	os.Remove(filepath)
 }
 
 func TestMakeExampleConfigWithInstructions(t *testing.T) {
@@ -51,16 +49,13 @@ func TestMakeExampleConfigWithInstructions(t *testing.T) {
 
 	filepath := path.Join(configDir, filename)
 	t.Logf("Wrote to temp file %s\n", filepath)
+	defer os.Remove(filepath)
 
 	fileContents := getFileContents(t, filepath)
 
 	if len(fileContents) < 50 {
 		t.Errorf("Expected file to be at least 50 characters, got %d", len(fileContents))
 	}
-	// TODO could setup a golden file to compare to
-
-	// remove example file when done
-	os.Remove(filepath)
 }
 
 func TestParseAllConfigs(t *testing.T) {
@@ -70,6 +65,7 @@ func TestParseAllConfigs(t *testing.T) {
 	filename := "oneterminal-example-parse-configs.yml"
 	MakeExampleConfigFromStruct(filename)
 	t.Logf("Wrote to temp file %s\n", path.Join(configDir, filename))
+	defer os.Remove(path.Join(configDir, filename))
 
 	configs, err := ParseAllConfigs()
 	if err != nil {
@@ -83,9 +79,12 @@ func TestParseAllConfigs(t *testing.T) {
 
 	for _, config := range configs {
 		// only check the generated example command
-		if config.Name == "somename" {
+		if config.Name == "example-name" {
 			if config.Shell != "zsh" {
 				t.Errorf(`Expected shell to be set to "zsh", got %q"`, config.Shell)
+			}
+			if config.Alias != "exname" {
+				t.Errorf(`want Alias %q, got %q"`, "exname", config.Alias)
 			}
 			if config.Short == "" {
 				t.Errorf("Expected config's Short to not be an empty string, got %q", config.Short)
@@ -101,7 +100,4 @@ func TestParseAllConfigs(t *testing.T) {
 			}
 		}
 	}
-
-	// delete that file when done
-	os.Remove(path.Join(configDir, filename))
 }
