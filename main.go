@@ -9,7 +9,7 @@ import (
 
 // variable is updated by goreleaser automatically but manually added here too
 // for manual/from source builds like `go get/install`
-var version = "0.4.0"
+var version = "0.4.1"
 
 func main() {
 	rootCmd, err := cli.Init(version)
