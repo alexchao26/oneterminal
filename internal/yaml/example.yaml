@@ -1,0 +1,39 @@
+# Name to invoke the command via $ oneterminal <name>
+name: example-name
+# optional alias for name
+alias: exname 
+
+# optional: zsh (default), bash, sh
+shell: zsh 
+
+# optional help texts
+short: an example command that says hello twice
+long: Optional longer description
+
+# An array of commands. The only required field is `command`.
+#   1. command {string}: the command to run directly in a shell
+#   2. name {string default: ""}: used to prefix each line of this command's
+#        output AND for other commands to list dependencies
+#        NOTE: an empty string is a valid name and is useful for things like
+#           vault which write to stdout in small chunks
+#   3. directory {string, default: $HOME}: what directory to run the command in
+#   4. silence {boolean, default: false}, silence this command's output?
+#   5. depends-on {[]string, optional}: which (names of) commands to wait for
+#   6. ready-regexp {string, optional}: a regular expression that the outputs
+#        must match for this command to be considered "ready" and for its
+#        dependents to begin running
+#   7. environment {map[string]string, optional} to set environment variables
+commands:
+- name: greeter-1
+  command: echo hello from window 1
+  ready-regexp: "window [0-9]"
+- name: greeter-2
+  command: echo hello $NAME from $PWD
+  directory: $HOME/go
+  depends-on:
+  - greeter-1
+  environment:
+    NAME: potato
+- name: ""
+  command: echo "they silenced me :'("
+  silence: true
