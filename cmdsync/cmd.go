@@ -1,3 +1,6 @@
+// Package cmdsync has logic for synchronizing multiple shell comands.
+// Commands can depend on the completion or readiness of other commands where
+// readiness can be determined by the output matching some regular expression.
 package cmdsync
 
 import (
@@ -34,7 +37,7 @@ type ShellCmd struct {
 
 type ShellCmdOption func(*ShellCmd) error
 
-// NewCmd defaults to using zsh. bash and sh are also supported
+// NewShellCmd defaults to using zsh. bash and sh are also supported
 func NewShellCmd(shell, command string, options ...ShellCmdOption) (*ShellCmd, error) {
 	if shell == "" {
 		shell = "zsh"
