@@ -2,13 +2,13 @@ package cmdsync
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -34,7 +34,7 @@ func (g *Group) AddCommands(commands ...*ShellCmd) error {
 	g.mut.Lock()
 	defer g.mut.Unlock()
 	if g.hasStarted {
-		return errors.New("Group has already been started")
+		return fmt.Errorf("Group has already been started")
 	}
 	g.commands = append(g.commands, commands...)
 	return nil
@@ -94,13 +94,13 @@ func (g *Group) RunContext(ctx context.Context) error {
 
 				canStart, err := checkDependencies(cmd, namesToCmds)
 				if err != nil {
-					return errors.Wrap(err, cmd.name)
+					return fmt.Errorf("%s: %w", cmd.name, err)
 				}
 				if canStart {
 					ticker.Stop()
 					err := cmd.Run()
 					if err != nil {
-						return errors.Wrap(err, cmd.name)
+						return fmt.Errorf("%s: %w", cmd.name, err)
 					}
 					return nil
 				}
@@ -125,10 +125,10 @@ func checkDependencies(cmd *ShellCmd, allCmdsMap map[string]*ShellCmd) (bool, er
 	for _, depName := range cmd.dependsOn {
 		depCmd, ok := allCmdsMap[depName]
 		if !ok {
-			return false, errors.Errorf("%q depends-on %q, but %q does not exist", cmd.name, depName, depName)
+			return false, fmt.Errorf("%q depends-on %q, but %q does not exist", cmd.name, depName, depName)
 		}
 		if cmd.name == depName {
-			return false, errors.Errorf("%s depends on itself", cmd.name)
+			return false, fmt.Errorf("%s depends on itself", cmd.name)
 		}
 		if !depCmd.IsReady() {
 			return false, nil

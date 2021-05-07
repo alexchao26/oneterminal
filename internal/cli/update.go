@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os/exec"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -72,16 +71,16 @@ func getMostRecentVersion(currentVersion string) (string, error) {
 	fmt.Println("Checking for the latest release from Github...")
 	req, err := http.NewRequest("GET", "https://api.github.com/repos/alexchao26/oneterminal/releases?page=1", nil)
 	if err != nil {
-		return "", errors.Wrap(err, "Making Github request")
+		return "", fmt.Errorf("making Github request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", errors.Wrap(err, "Making Github request")
+		return "", fmt.Errorf("making Github request: %w", err)
 	}
 	if resp.StatusCode != 200 {
-		return "", errors.Errorf("Bad response from Github %d", resp.StatusCode)
+		return "", fmt.Errorf("bad response from Github %d", resp.StatusCode)
 	}
 
 	defer resp.Body.Close()
@@ -90,7 +89,7 @@ func getMostRecentVersion(currentVersion string) (string, error) {
 	}
 	err = json.NewDecoder(resp.Body).Decode(&githubResp)
 	if err != nil {
-		return "", errors.Wrap(err, "Decoding Github API Response")
+		return "", fmt.Errorf("decoding Github API Response: %w", err)
 	}
 
 	var mostRecentVersion string
@@ -101,7 +100,7 @@ func getMostRecentVersion(currentVersion string) (string, error) {
 	}
 
 	if mostRecentVersion == "" {
-		return "", errors.New("Didn't find any Github releases")
+		return "", fmt.Errorf("didn't find any Github releases")
 	}
 	return mostRecentVersion, nil
 }

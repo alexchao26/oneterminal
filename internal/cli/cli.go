@@ -1,3 +1,4 @@
+// Package cli initializes cobra commands by parsing yaml files.
 package cli
 
 import (
@@ -6,7 +7,6 @@ import (
 	"github.com/alexchao26/oneterminal/cmdsync"
 	"github.com/alexchao26/oneterminal/color"
 	"github.com/alexchao26/oneterminal/internal/yaml"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +28,7 @@ Run "oneterminal example" to generate an example config file`,
 
 	allConfigs, err := yaml.ParseAllConfigs()
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing yml configs")
+		return nil, fmt.Errorf("parsing yml configs: %w", err)
 	}
 
 	if err := yaml.HasNameCollisions(allConfigs); err != nil {
@@ -97,6 +97,11 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 					fmt.Printf("running %q: %v\n", config.Name, err)
 				}
 			},
+		}
+
+		if config.Alias != "" {
+			// intentionally only support a single alias, keeps yaml simpler
+			cobraCommand.Aliases = []string{config.Alias}
 		}
 
 		cobraCommands = append(cobraCommands, cobraCommand)

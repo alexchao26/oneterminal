@@ -6,8 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// CompletionCmd returns a string that can be piped to add bash
-// or zsh completions
+// CompletionCmd returns a string that can be piped to add bash/zsh completions
 var CompletionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh]",
 	Short: "Generate completion script",
