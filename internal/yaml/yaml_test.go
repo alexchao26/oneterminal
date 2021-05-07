@@ -20,7 +20,7 @@ func getFileContents(t *testing.T, path string) string {
 	return string(bytes)
 }
 
-func TestMakeExampleConfigWithInstructions(t *testing.T) {
+func TestWriteExampleConfig(t *testing.T) {
 	setupTempDir(t)
 
 	filename := "oneterminal-example-with-instructions.yml"
@@ -37,6 +37,10 @@ func TestMakeExampleConfigWithInstructions(t *testing.T) {
 
 	if len(fileContents) < 50 {
 		t.Errorf("want file to be at least 50 characters, got %d", len(fileContents))
+	}
+	if fileContents != string(exampleConfig) {
+		// too verbose to log reasonably...
+		t.Errorf("want new config to be the same as embedded example config")
 	}
 }
 
