@@ -116,7 +116,6 @@ func (s *ShellCmd) Interrupt() error {
 
 	// send an interrupt to the entire process group to reach "grandchildren"
 	// https://bigkevmcd.github.io/go/pgrp/context/2019/02/19/terminating-processes-in-go.html
-	// is syscall.SIGINT okay here? might need to be SIGTERM/SIGKILL
 	err := syscall.Kill(-s.command.Process.Pid, syscall.SIGINT)
 	if err != nil {
 		return fmt.Errorf("sending interrupt to %s: %w", s.name, err)

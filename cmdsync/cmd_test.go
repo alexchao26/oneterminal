@@ -92,7 +92,9 @@ func TestShellCmd_Run(t *testing.T) {
 	for _, shell := range shells {
 		t.Logf("using %s shell", shell)
 		for _, tt := range tests {
+			tt := tt
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 				shCmd, err := NewShellCmd(shell, tt.command, tt.commandOpts...)
 				if err != nil {
 					t.Errorf("NewShellCmd() error want nil, got %v", err)
@@ -102,9 +104,18 @@ func TestShellCmd_Run(t *testing.T) {
 				shCmd.stdout = &sb
 
 				err = shCmd.Run()
-				// also check error strings in case of non-sentinel errors
-				if err != tt.wantError && err.Error() != tt.wantError.Error() {
-					t.Errorf("shCmd.Run() want err %v, got %v", tt.wantError, err)
+				if err != tt.wantError {
+					// also check error strings in case of non-sentinel errors
+					want, got := "nil", "nil"
+					if tt.wantError != nil {
+						want = tt.wantError.Error()
+					}
+					if err != nil {
+						got = err.Error()
+					}
+					if want != got {
+						t.Errorf("shCmd.Run() want err %q, got %q", want, got)
+					}
 				}
 
 				output := sb.String()

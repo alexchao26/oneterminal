@@ -3,9 +3,9 @@ package cmdsync
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -50,7 +50,7 @@ func (g *Group) AddCommands(commands ...*ShellCmd) error {
 // The returned error is the first error returned from any of the Group's
 // ShellCmds, if any.
 func (g *Group) Run() error {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	go func() {
 		<-ctx.Done()
 		stop()
@@ -64,7 +64,7 @@ func (g *Group) Run() error {
 //
 // To cancel the context via an interrupt signal from the terminal (ctrl + c),
 // use signal.NotifyContext.
-//   ctx, done := signal.NotifyContext(context.Background(), syscall.SIGINT)
+//   ctx, done := signal.NotifyContext(context.Background(), os.Interrupt)
 //   // ensure done() is called to restore normal SIGINT behavior
 //   go func() {
 //       <- ctx.Done()
@@ -90,6 +90,7 @@ func (g *Group) RunContext(ctx context.Context) error {
 	}()
 
 	for _, cmd := range g.commands {
+		// https://github.com/golang/go/wiki/CommonMistakes#using-goroutines-on-loop-iterator-variables
 		cmd := cmd
 		eg.Go(func() error {
 			ticker := time.NewTicker(time.Millisecond * 200)
