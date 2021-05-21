@@ -6,6 +6,7 @@ package cmdsync
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -31,7 +32,8 @@ type ShellCmd struct {
 	silenceOutput bool
 	ready         bool           // if command's dependent's can begin
 	readyPattern  *regexp.Regexp // pattern to match against command outputs
-	dependsOn     []string
+	dependsOn     []string       // names of other ShellCmds
+	stdout        io.Writer      // set to os.Stdout, included for testing
 }
 
 type ShellCmdOption func(*ShellCmd) error
@@ -57,6 +59,7 @@ func NewShellCmd(shell, command string, options ...ShellCmdOption) (*ShellCmd, e
 
 	s := &ShellCmd{
 		command: execCmd,
+		stdout:  os.Stdout,
 	}
 
 	// apply functional options
@@ -116,7 +119,7 @@ func (s *ShellCmd) Interrupt() error {
 	// is syscall.SIGINT okay here? might need to be SIGTERM/SIGKILL
 	err := syscall.Kill(-s.command.Process.Pid, syscall.SIGINT)
 	if err != nil {
-		return fmt.Errorf("Error sending interrupt to %s: %w", s.name, err)
+		return fmt.Errorf("sending interrupt to %s: %w", s.name, err)
 	}
 	return nil
 }
@@ -134,15 +137,14 @@ func (s *ShellCmd) Write(in []byte) (int, error) {
 	if s.silenceOutput {
 		return len(in), nil
 	}
-
 	// if no name is set, just write straight to stdout
 	var err error
 	if s.name == "" {
-		_, err = os.Stdout.Write(in)
+		_, err = s.stdout.Write(in)
 	} else {
 		// if command's name is set, print with prefixed outputs
 		prefixed := prefixEveryline(string(in), s.color.Add(s.name))
-		_, err = os.Stdout.Write([]byte(prefixed))
+		_, err = s.stdout.Write([]byte(prefixed))
 	}
 
 	return len(in), err
@@ -176,7 +178,7 @@ func CmdDir(dir string) ShellCmdOption {
 
 		_, err := os.Stat(expandedDir)
 		if os.IsNotExist(err) {
-			return fmt.Errorf("Directory %q does not exist: %s", dir, err)
+			return fmt.Errorf("directory %q does not exist: %s", dir, err)
 		}
 
 		s.command.Dir = expandedDir
@@ -231,8 +233,11 @@ func ReadyPattern(pattern string) ShellCmdOption {
 // Note that there is no validation that the cmdNames are valid/match other
 // ShellCmd's configs (because it would cause a circular dependency). Some, but
 // not all possible config errors are checked at runtime.
-func DependsOn(cmdNames []string) ShellCmdOption {
+func DependsOn(cmdNames ...string) ShellCmdOption {
 	return func(s *ShellCmd) error {
+		if len(cmdNames) == 0 {
+			return fmt.Errorf("zero-length DependsOn list")
+		}
 		s.dependsOn = cmdNames
 		return nil
 	}

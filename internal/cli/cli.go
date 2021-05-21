@@ -78,7 +78,7 @@ func makeCommands(configs []yaml.OneTerminalConfig) []*cobra.Command {
 						options = append(options, cmdsync.ReadyPattern(cmd.ReadyRegexp))
 					}
 					if len(cmd.DependsOn) != 0 {
-						options = append(options, cmdsync.DependsOn(cmd.DependsOn))
+						options = append(options, cmdsync.DependsOn(cmd.DependsOn...))
 					}
 					if cmd.Environment != nil {
 						options = append(options, cmdsync.Environment(cmd.Environment))

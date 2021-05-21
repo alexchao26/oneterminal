@@ -1,74 +1,125 @@
 package cmdsync
 
 import (
+	"errors"
 	"log"
 	"os/exec"
 	"strings"
 	"testing"
 )
 
-var shell string
-
-func init() {
+func getInstalledShells(t *testing.T) []string {
+	var shells []string
 	// find a shell that can be used for tests
 	for _, s := range []string{"zsh", "bash", "sh"} {
 		_, err := exec.LookPath(s)
 		if err != nil {
 			log.Printf("%q shell not installed", s)
-			continue
 		}
-		shell = s
-		return
+		shells = append(shells, s)
 	}
-	panic("no supported shell installed, tried zsh, bash and sh")
+
+	if len(shells) == 0 {
+		t.Fatalf("no shells supported, tried zsh, bash and sh")
+	}
+
+	return shells
 }
 
 func TestShellCmd_Run(t *testing.T) {
-	tests := map[string]struct {
+	shells := getInstalledShells(t)
+
+	tests := []struct {
+		name                string
 		command             string
 		commandOpts         []ShellCmdOption
+		wantOutput          string
 		wantOutputToContain []string
-		wantErr             bool
+		wantError           error
 	}{
-		"echo Hello World": {"echo Hello, world!", nil, []string{"Hello, world!"}, false},
-		"go version":       {"go version", nil, []string{"go version"}, false},
-		"SetEnvironment Option": {
-			"echo $TEST_ENV_VAR",
-			[]ShellCmdOption{
+		{
+			name:                "echo hello world",
+			command:             "echo Hello, world!",
+			commandOpts:         nil,
+			wantOutput:          "Hello, world!\n",
+			wantOutputToContain: []string{"Hello, world!"},
+			wantError:           nil,
+		},
+		{
+			name:                "go version",
+			command:             "go version",
+			commandOpts:         nil,
+			wantOutputToContain: []string{"go version"},
+			wantError:           nil,
+		},
+		{
+			name:    "SetEnvironment Option",
+			command: "echo $TEST_ENV_VAR",
+			commandOpts: []ShellCmdOption{
 				Environment(map[string]string{
 					"TEST_ENV_VAR": "beepboop",
 				}),
-			}, []string{"beepboop"},
-			false},
+			},
+			wantOutput: "beepboop\n",
+			wantError:  nil,
+		},
+		{
+			name:    "name prefixes output line",
+			command: "echo potato",
+			commandOpts: []ShellCmdOption{
+				Name("cmdname"),
+			},
+			wantOutput: "cmdname | potato\n",
+			wantError:  nil,
+		},
+		{
+			name:      "command with non-zero exit code errors",
+			command:   "exit 1",
+			wantError: errors.New("exit status 1"),
+		},
+		{
+			name:    "echo cmd then exit cmd",
+			command: "echo hello && exit 1",
+			commandOpts: []ShellCmdOption{
+				Name("NAME"),
+			},
+			wantOutput: "NAME | hello\n",
+			wantError:  errors.New("exit status 1"),
+		},
 	}
 
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Log(name, tt.command)
-			shCmd, err := NewShellCmd(shell, tt.command, tt.commandOpts...)
-			if err != nil {
-				t.Errorf("NewShellCmd() error want nil, got %v", err)
-			}
-
-			var sb strings.Builder // implements io.Writer
-			shCmd.command.Stdout = &sb
-			shCmd.command.Stderr = &sb
-			err = shCmd.Run()
-
-			if tt.wantErr && err == nil {
-				t.Errorf("shCmd.Run() want err, got nil")
-			}
-			if tt.wantErr == false && err != nil {
-				t.Errorf("shCmd.Run() want err = nil, got %v", err)
-			}
-
-			outputs := sb.String()
-			for _, wantPiece := range tt.wantOutputToContain {
-				if !strings.Contains(outputs, wantPiece) {
-					t.Errorf("shCmd.Run() = %q, want it to contain %q", outputs, wantPiece)
+	// test all installed and supported shells
+	for _, shell := range shells {
+		t.Logf("using %s shell", shell)
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				shCmd, err := NewShellCmd(shell, tt.command, tt.commandOpts...)
+				if err != nil {
+					t.Errorf("NewShellCmd() error want nil, got %v", err)
 				}
-			}
-		})
+
+				var sb strings.Builder // implements io.Writer
+				shCmd.stdout = &sb
+
+				err = shCmd.Run()
+				// also check error strings in case of non-sentinel errors
+				if err != tt.wantError && err.Error() != tt.wantError.Error() {
+					t.Errorf("shCmd.Run() want err %v, got %v", tt.wantError, err)
+				}
+
+				output := sb.String()
+				if tt.wantOutput != "" && tt.wantOutput != output {
+					t.Errorf("shCmd.Run() want %q, got %q", tt.wantOutput, output)
+				}
+
+				// check pieces because `go version` might output different ...versions
+				for _, wantPiece := range tt.wantOutputToContain {
+					if !strings.Contains(output, wantPiece) {
+						t.Errorf("shCmd.Run() want output to contain %q, got %q", wantPiece, output)
+					}
+				}
+			})
+		}
 	}
 }
 
@@ -80,6 +131,7 @@ func TestPrefixEachLine(t *testing.T) {
 		{"hello\nasdf", "shCmd", "shCmd | hello\nshCmd | asdf\n"},
 		{"Starting...\nWaiting...\nReady!", "launcher", "launcher | Starting...\nlauncher | Waiting...\nlauncher | Ready!\n"},
 	}
+
 	for _, tt := range tests {
 		actual := prefixEveryline(tt.input, tt.prefix)
 		if actual != tt.want {
