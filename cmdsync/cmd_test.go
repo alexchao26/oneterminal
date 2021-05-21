@@ -15,6 +15,7 @@ func getInstalledShells(t *testing.T) []string {
 		_, err := exec.LookPath(s)
 		if err != nil {
 			log.Printf("%q shell not installed", s)
+			continue
 		}
 		shells = append(shells, s)
 	}
@@ -38,12 +39,11 @@ func TestShellCmd_Run(t *testing.T) {
 		wantError           error
 	}{
 		{
-			name:                "echo hello world",
-			command:             "echo Hello, world!",
-			commandOpts:         nil,
-			wantOutput:          "Hello, world!\n",
-			wantOutputToContain: []string{"Hello, world!"},
-			wantError:           nil,
+			name:        "echo hello world",
+			command:     "echo Hello, world!",
+			commandOpts: nil,
+			wantOutput:  "Hello, world!\n",
+			wantError:   nil,
 		},
 		{
 			name:                "go version",
