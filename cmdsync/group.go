@@ -3,7 +3,6 @@ package cmdsync
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -40,18 +39,39 @@ func (g *Group) AddCommands(commands ...*ShellCmd) error {
 	return nil
 }
 
-// Run will run all of the group's ShellCmds and block until they have all finished
-// running, or an interrupt/kill signal is received
+// Run will run all of the group's ShellCmds and block until they have all
+// finished running or an interrupt signal is sent (ctrl + c). Internally it
+// relays the first interrupt signal to all underlying ShellCmds. Additional
+// interrupt commands will return to normal behavior.
 //
-// It checks for each ShellCmd's prerequisites (ShellCmds it depends-on being in a ready
-// state) before starting the ShellCmd
+// It checks for each ShellCmd's prerequisites before starting. See ShellCmd for
+// details on ready regexp.
 //
-// The returned error is the first error returned from the Group's ShellCmds, if any
+// The returned error is the first error returned from any of the Group's
+// ShellCmds, if any.
 func (g *Group) Run() error {
-	return g.RunContext(context.Background())
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT)
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+	return g.RunContext(ctx)
 }
 
-// RunContext is the same as Run but can also be cancelled via ctx
+// RunContext is the same as Run but does not setup singal notifying internally.
+// This means callers can only interrupt the Group's ShellCmds by cancelling the
+// context.
+//
+// To cancel the context via an interrupt signal from the terminal (ctrl + c),
+// use signal.NotifyContext.
+//   ctx, done := signal.NotifyContext(context.Background(), syscall.SIGINT)
+//   // ensure done() is called to restore normal SIGINT behavior
+//   go func() {
+//       <- ctx.Done()
+//       done()
+//   }()
+//   err := group.Run(ctx)
+//   // handle error
 func (g *Group) RunContext(ctx context.Context) error {
 	g.mut.Lock()
 	g.hasStarted = true
@@ -64,19 +84,10 @@ func (g *Group) RunContext(ctx context.Context) error {
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	signalChan := make(chan os.Signal)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		// events that could lead to a shutdown:
-		// 1. ctx is ended (from parent or errgroup Go routine returning non-nil error)
-		// 2. signal is received (ctrl + c)
-		select {
-		case <-ctx.Done():
-		case <-signalChan:
-		}
+		<-ctx.Done()
 		g.SendInterrupts()
 	}()
-	defer close(signalChan)
 
 	for _, cmd := range g.commands {
 		cmd := cmd

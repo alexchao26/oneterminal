@@ -18,7 +18,7 @@ func makeListCmd(allConfigs []yaml.OneTerminalConfig) *cobra.Command {
 
 Excludes built in commands.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Println("Configured commands (run via `oneterminal <name>`")
+			fmt.Println("Configured commands (runable via `oneterminal <name>`)")
 			fmt.Println()
 			w := tabwriter.NewWriter(os.Stdout, 0, 8, 0, '\t', 0)
 			for _, config := range allConfigs {
