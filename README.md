@@ -9,16 +9,10 @@ oneterminal is a CLI written in [Go](https://golang.org/). Each command is confi
 
 # How to Install
 
-If you have a local [Go installation](https://golang.org/doc/install):
+If you have a local [Go 1.16+ installation](https://golang.org/doc/install) use [`go install`](https://golang.org/doc/go1.16#go-command):
 
-For Go 1.16+ use [`go install`](https://golang.org/doc/go1.16#go-command):
 ```go
 go install github.com/alexchao26/oneterminal@latest
-```
-
-For older Go versions:
-```go
-go get -u github.com/alexchao26/oneterminal
 ```
 
 ### From Github releases
@@ -109,6 +103,7 @@ Command                                  | Description
 `oneterminal example`                    | Makes a demo oneterminal config in ~/.config/oneterminal
 `oneterminal completion --help`          | Get helper text to setup shell completion for zsh or bash shells
 `oneterminal version`                    | Print the version number of oneterminal
+`oneterminal list`                       | List only configured commands
 `oneterminal help`                       | Help about any command
 `oneterminal update`                     | Updates oneterminal to latest release
 `oneterminal <your-configured-commands>` | Your commands configured via ~/.config/oneterminal/*.yml
