@@ -60,12 +60,12 @@ func TestGroup_RunContext(t *testing.T) {
 		{
 			name: "ready regexp allows dependent commands to start concurrently",
 			group: NewGroup(
-				mustNewShellCmd(testShell, "echo next", Name("second"), DependsOn("first")),
-				mustNewShellCmd(testShell, "echo last", Name("last"), DependsOn("second", "first")),
-				mustNewShellCmd(testShell, "echo monkeypotato && sleep 1 && echo finally",
+				mustNewShellCmd(testShell, "echo monkeypotato && sleep 5 && echo finally",
 					Name("first"),
 					ReadyPattern("monkey"),
 				),
+				mustNewShellCmd(testShell, "echo next", Name("second"), DependsOn("first")),
+				mustNewShellCmd(testShell, "echo last", Name("last"), DependsOn("second", "first")),
 			),
 			wantOutput: "first | monkeypotato\nsecond | next\nlast | last\nfirst | finally\n",
 			wantError:  nil,
